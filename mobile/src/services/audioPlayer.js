@@ -181,8 +181,21 @@ export const AudioProvider = ({ children }) => {
                 uri = song.localUri;
                 console.log('🎵 Playing from song localUri:', uri);
             } else {
-                uri = `${api.defaults.baseURL}/stream/${encodeURIComponent(song.id)}`;
+                try {
+                    const playRes = await api.post('/play', { song, download: false }, { timeout: 15000 });
+                    if (playRes && playRes.data && playRes.data.url) {
+                        uri = playRes.data.url;
+                    } else {
+                        uri = `${api.defaults.baseURL}/stream/${encodeURIComponent(song.id)}`;
+                    }
+                } catch (err) {
+                    uri = `${api.defaults.baseURL}/stream/${encodeURIComponent(song.id)}`;
+                }
                 console.log('🌐 Streaming online:', uri);
+            }
+
+            if (playId !== playbackIdRef.current) {
+                return;
             }
 
             const { sound: newSound } =

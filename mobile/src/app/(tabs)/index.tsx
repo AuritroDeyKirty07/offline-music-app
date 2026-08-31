@@ -61,8 +61,12 @@ export default function HomeScreen() {
         setLoading(false);
     };
 
-    const handlePlayHomeItem = async (item: any) => {
-        playSong(item, [item], 0);
+    const handlePlayHomeItem = async (item: any, idx?: number) => {
+        const initialIndex = idx !== undefined && idx >= 0 ? idx : recommendations.findIndex((s: any) => s.id === item.id);
+        const startIdx = initialIndex >= 0 ? initialIndex : 0;
+        const initialQueue = recommendations.length > 0 ? recommendations : [item];
+
+        playSong(item, initialQueue, startIdx);
 
         try {
             const prefs: any = await getPreferences();
@@ -72,11 +76,14 @@ export default function HomeScreen() {
                 language: (prefs.languages && prefs.languages[0]) || 'English',
                 artists: prefs.artists || [],
                 genres: prefs.genres || []
-            }, { timeout: 30000 });
+            }, { timeout: 15000 });
 
             if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-                const filtered = res.data.filter((s: any) => s.id !== item.id);
-                appendToQueue(filtered);
+                const existingIds = new Set(initialQueue.map(s => s.id));
+                const filtered = res.data.filter((s: any) => !existingIds.has(s.id));
+                if (filtered.length > 0) {
+                    appendToQueue(filtered);
+                }
             }
         } catch (e: any) {
             console.warn("[Home] Background queue recommendation:", e?.message || e);
@@ -84,14 +91,14 @@ export default function HomeScreen() {
     };
 
     const renderGridItem = (item: any, index: number) => (
-        <TouchableOpacity key={item.id} style={styles.gridCard} onPress={() => handlePlayHomeItem(item)}>
+        <TouchableOpacity key={item.id} style={styles.gridCard} onPress={() => handlePlayHomeItem(item, index)}>
             <Image source={{ uri: item.thumbnail }} style={styles.gridImage} />
             <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
         </TouchableOpacity>
     );
 
     const renderListItem = ({ item, index }: { item: any; index: number }) => (
-        <TouchableOpacity key={item.id} style={styles.listCard} onPress={() => handlePlayHomeItem(item)}>
+        <TouchableOpacity key={item.id} style={styles.listCard} onPress={() => handlePlayHomeItem(item, index)}>
             <Image source={{ uri: item.thumbnail }} style={styles.listImage} />
             <View style={styles.listInfo}>
                 <Text style={styles.listTitle} numberOfLines={1}>{item.title}</Text>

@@ -499,25 +499,48 @@ async function searchMusic(
         return true;
     });
 
-    // 4. Sort and prioritize Official channels, Topic channels, VEVO, and verified labels
+    // 4. Smart Query Relevance + Official Ranking Algorithm
+    const cleanTokens = lowerQ.split(/\s+/).filter(t => t.length > 1);
+
+    const getScore = (song) => {
+        let score = 0;
+        const titleLower = song.title.toLowerCase();
+        const authorLower = song.author.toLowerCase();
+
+        // 1. Exact query match in title
+        if (titleLower.includes(lowerQ)) {
+            score += 80;
+        }
+
+        // 2. Token match in title and author
+        cleanTokens.forEach(token => {
+            if (titleLower.includes(token)) score += 30;
+            if (authorLower.includes(token)) score += 20;
+        });
+
+        // 3. Official / Topic / VEVO channel boost
+        const isOfficialAuthor = authorLower.includes('topic') || authorLower.includes('vevo') || authorLower.includes('official') || OFFICIAL_LABELS.some(l => authorLower.includes(l));
+        if (isOfficialAuthor) score += 40;
+
+        // 4. Official Audio / Official Video boost
+        if (titleLower.includes('official audio') || titleLower.includes('official video') || titleLower.includes('official music video')) {
+            score += 25;
+        }
+
+        // 5. Penalize live performances or lyric videos if official exists
+        if (titleLower.includes('live performance') || titleLower.includes('concert')) {
+            score -= 20;
+        }
+
+        return score;
+    };
+
     filtered.sort((a, b) => {
-        const aAuthor = a.author.toLowerCase();
-        const bAuthor = b.author.toLowerCase();
-        const aTitle = a.title.toLowerCase();
-        const bTitle = b.title.toLowerCase();
-
-        const aIsOfficial = aAuthor.includes('topic') || aAuthor.includes('vevo') || aAuthor.includes('official') || OFFICIAL_LABELS.some(l => aAuthor.includes(l));
-        const bIsOfficial = bAuthor.includes('topic') || bAuthor.includes('vevo') || bAuthor.includes('official') || OFFICIAL_LABELS.some(l => bAuthor.includes(l));
-
-        if (aIsOfficial && !bIsOfficial) return -1;
-        if (!aIsOfficial && bIsOfficial) return 1;
-
-        // Prioritize official audio / video tags in title
-        const aHasTag = aTitle.includes('official audio') || aTitle.includes('official video') || aTitle.includes('official music video');
-        const bHasTag = bTitle.includes('official audio') || bTitle.includes('official video') || bTitle.includes('official music video');
-        if (aHasTag && !bHasTag) return -1;
-        if (!aHasTag && bHasTag) return 1;
-
+        const scoreA = getScore(a);
+        const scoreB = getScore(b);
+        if (scoreB !== scoreA) {
+            return scoreB - scoreA;
+        }
         return 0;
     });
 

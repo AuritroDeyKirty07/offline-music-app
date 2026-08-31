@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Image, ScrollView } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search as SearchIcon, Check, ArrowLeft } from 'lucide-react-native';
 import { api } from '../../services/api';
 import { useAudioPlayer } from '../../services/audioPlayer';
@@ -84,27 +84,48 @@ export default function SearchScreen() {
         }
     };
 
-    const performSearch = async (text: string) => {
+    const searchTimerRef = useRef<any>(null);
+    const latestSearchIdRef = useRef<number>(0);
+
+    const performSearch = (text: string) => {
         setQuery(text);
-        if (text.length > 2) {
+        if (searchTimerRef.current) {
+            clearTimeout(searchTimerRef.current);
+        }
+
+        if (text.trim().length > 1) {
             setIsSearching(true);
-            try {
-                const res = await api.get(`/search?q=${encodeURIComponent(text)}&officialOnly=${officialOnly}`);
-                setResults(res.data);
-            } catch (error) {
-                console.error(error);
-            }
-            setIsSearching(false);
+            searchTimerRef.current = setTimeout(async () => {
+                const searchId = Date.now();
+                latestSearchIdRef.current = searchId;
+                try {
+                    const res = await api.get(`/search?q=${encodeURIComponent(text.trim())}&officialOnly=${officialOnly}`);
+                    if (latestSearchIdRef.current === searchId) {
+                        setResults(res.data || []);
+                    }
+                } catch (error) {
+                    console.error(error);
+                } finally {
+                    if (latestSearchIdRef.current === searchId) {
+                        setIsSearching(false);
+                    }
+                }
+            }, 300);
         } else {
             setResults([]);
+            setIsSearching(false);
         }
     };
 
-    const handlePlaySearchItem = async (item: any) => {
-        // 1. Play searched song as current track
-        playSong(item, [item], 0);
+    const handlePlaySearchItem = async (item: any, idx?: number) => {
+        const initialIndex = idx !== undefined && idx >= 0 ? idx : results.findIndex(s => s.id === item.id);
+        const startIdx = initialIndex >= 0 ? initialIndex : 0;
+        const initialQueue = results.length > 0 ? results : [item];
 
-        // 2. Fetch AI recommended tracks based on this song and user's taste preferences in background
+        // 1. Play searched song and immediately populate queue with search results
+        playSong(item, initialQueue, startIdx);
+
+        // 2. Fetch AI recommended tracks in background to extend queue
         try {
             const prefs: any = await getPreferences();
             const res = await api.post('/ai-recommend', {
@@ -113,30 +134,33 @@ export default function SearchScreen() {
                 language: (prefs.languages && prefs.languages[0]) || 'English',
                 artists: prefs.artists || [],
                 genres: prefs.genres || []
-            }, { timeout: 30000 });
+            }, { timeout: 15000 });
 
             if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-                const filtered = res.data.filter((s: any) => s.id !== item.id);
-                appendToQueue(filtered);
+                const existingIds = new Set(initialQueue.map(s => s.id));
+                const filtered = res.data.filter((s: any) => !existingIds.has(s.id));
+                if (filtered.length > 0) {
+                    appendToQueue(filtered);
+                }
             }
         } catch (e: any) {
             console.warn("[Search] Background queue recommendation:", e?.message || e);
         }
     };
 
-    const renderItem = ({ item }: { item: any }) => {
+    const renderItem = ({ item, index }: { item: any; index: number }) => {
         const isDownloaded = downloadedIds.has(item.id) || item.isDownloaded;
 
         return (
-            <TouchableOpacity style={styles.card} onPress={() => handlePlaySearchItem(item)}>
+            <TouchableOpacity style={styles.card} onPress={() => handlePlaySearchItem(item, index)}>
                 <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
                 <View style={styles.cardInfo}>
                     <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
                     <View style={styles.authorRow}>
                         {isDownloaded && (
                             <View style={styles.downloadBadge}>
-                                <Check color="#1ed760" size={12} strokeWidth={3} />
-                                <Text style={styles.downloadBadgeText}>Downloaded</Text>
+                                <Check color="#1ed760" size={10} />
+                                <Text style={styles.downloadBadgeText}>Offline</Text>
                             </View>
                         )}
                         <Text style={styles.author} numberOfLines={1}>{item.author}</Text>

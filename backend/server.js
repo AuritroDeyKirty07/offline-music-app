@@ -895,7 +895,7 @@ app.post(
                 req.body.officialOnly ===
                 true;
 
-            const topTitles = (titles || []).slice(0, 8);
+            const topTitles = (titles || []).slice(0, 20);
 
             const promises =
                 topTitles.map(

@@ -4,6 +4,7 @@ const playdl = require('play-dl');
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
+const ffmpegPath = require('ffmpeg-static');
 
 // ============================================================
 // DIRECTORIES
@@ -634,6 +635,7 @@ function downloadSong(songInfo) {
                         output: outputPath,
                         x: true,
                         audioFormat: 'mp3',
+                        ffmpegLocation: ffmpegPath,
                         noCheckCertificates: true,
                         noWarnings: true
                     }

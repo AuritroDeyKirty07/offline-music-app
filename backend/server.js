@@ -555,37 +555,42 @@ function setCachedStreamUrl(
     });
 }
 
+const ffmpegPath = require('ffmpeg-static');
+
 async function extractStreamUrl(id) {
     const cached = getCachedStreamUrl(id);
     if (cached) return cached;
 
     const youtubeUrl = `https://www.youtube.com/watch?v=${id}`;
 
-    // 1. Try play-dl (fast in-process extractor)
+    // 1. Try youtube-dl-exec with ffmpeg-static
     try {
-        const streamInfo = await playdl.stream(youtubeUrl, { quality: 2 });
+        const info = await youtubedl(youtubeUrl, {
+            dumpSingleJson: true,
+            format: 'bestaudio/best',
+            ffmpegLocation: ffmpegPath,
+            noWarnings: true
+        });
+
+        const directUrl = info.url || info.requested_formats?.[0]?.url || (info.formats && info.formats.find(f => f.acodec !== 'none' && f.url)?.url);
+        if (directUrl) {
+            setCachedStreamUrl(id, directUrl);
+            return directUrl;
+        }
+    } catch (e) {
+        console.error('Stream extraction failed for:', id, e.message);
+    }
+
+    // 2. Try play-dl fallback
+    try {
+        const videoInfo = await playdl.video_basic_info(youtubeUrl);
+        const streamInfo = await playdl.stream_from_info(videoInfo, { quality: 2 });
         if (streamInfo && streamInfo.url) {
             setCachedStreamUrl(id, streamInfo.url);
             return streamInfo.url;
         }
     } catch (e) {
-        // fallback
-    }
-
-    // 2. Fallback to youtube-dl-exec
-    try {
-        const info = await youtubedl(youtubeUrl, {
-            dumpSingleJson: true,
-            format: 'bestaudio',
-            noWarnings: true
-        });
-
-        if (info && info.url) {
-            setCachedStreamUrl(id, info.url);
-            return info.url;
-        }
-    } catch (e) {
-        console.error('Stream extraction failed for:', id, e.message);
+        // play-dl fallback
     }
 
     return null;
@@ -983,24 +988,31 @@ app.post(
                 }
             );
 
-            res.json(
-                Array.from(
-                    uniqueMap.values()
-                )
-            );
+            let finalResults = Array.from(uniqueMap.values());
+            if (finalResults.length === 0) {
+                console.log('[AI Home] Falling back to database recommendations');
+                finalResults = await getRecommendations(req.body);
+            }
+
+            res.json(finalResults);
 
         } catch (error) {
             console.error(
                 'AI Home Recommendation Error:',
-                error
+                error.message
             );
 
-            res
-                .status(500)
-                .json({
-                    error:
-                        'Failed to generate AI home recommendations'
-                });
+            try {
+                const fallbackResults = await getRecommendations(req.body);
+                return res.json(fallbackResults);
+            } catch (e) {
+                res
+                    .status(500)
+                    .json({
+                        error:
+                            'Failed to generate AI home recommendations'
+                    });
+            }
         }
     }
 );

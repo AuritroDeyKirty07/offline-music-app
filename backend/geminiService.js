@@ -5,12 +5,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // ============================================================
 
 const CANDIDATE_MODELS = [
-    'gemini-3.5-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-3.7-flash',
     'gemini-3.6-flash',
-    'gemini-3.1-pro-preview',
-    'gemini-3.1-flash-lite'
+    'gemini-3.7-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.1-pro-preview'
 ];
 
 function getApiKeys() {
@@ -83,7 +82,7 @@ async function generateWithFailover(prompt, cacheKey = null) {
 
                 const callPromise = model.generateContent(prompt);
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Gemini API request timed out (3.5s)')), 3500)
+                    setTimeout(() => reject(new Error('Gemini API request timed out (5s)')), 5000)
                 );
 
                 const result = await Promise.race([callPromise, timeoutPromise]);

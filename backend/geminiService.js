@@ -254,7 +254,7 @@ const FALLBACK_BY_LANGUAGE = {
     'Hindi': [
         'Kesariya - Arijit Singh',
         'Apna Bana Le - Arijit Singh',
-        'Tum Hi Ho - Arijit Singh',
+        'Tum Hi Ho Aashiqui 2 - Arijit Singh',
         'Chaleya - Arijit Singh, Shilpa Rao',
         'Husn - Anuv Jain',
         'Baarishein - Anuv Jain',

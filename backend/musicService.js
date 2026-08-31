@@ -420,9 +420,14 @@ async function searchMusic(
 
     let rawList = [];
 
-    // 1. Try yt-search with safe string extraction
+    // 1. Try yt-search with safe string extraction & 2.5s timeout
     try {
-        const r = await ytSearch(searchQuery);
+        const searchPromise = ytSearch(searchQuery);
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('ytSearch timed out (2.5s)')), 2500)
+        );
+
+        const r = await Promise.race([searchPromise, timeoutPromise]);
         if (r && Array.isArray(r.videos)) {
             rawList = r.videos.map(v => {
                 const titleStr = typeof v.title === 'string' ? v.title : (v.title?.text || v.title?.runs?.[0]?.text || '');
@@ -438,16 +443,21 @@ async function searchMusic(
             }).filter(v => v.id && v.title);
         }
     } catch (e) {
-        console.warn(`[yt-search] failed for "${searchQuery}", falling back to play-dl:`, e.message);
+        // Fallback to play-dl
     }
 
     // 2. Resilient fallback to play-dl if ytSearch failed or returned empty
     if (!rawList || rawList.length === 0) {
         try {
-            const playdlResults = await playdl.search(searchQuery, {
+            const playdlPromise = playdl.search(searchQuery, {
                 limit: Math.max(limit * 2, 20),
                 source: { youtube: 'video' }
             });
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('play-dl timed out (2.5s)')), 2500)
+            );
+
+            const playdlResults = await Promise.race([playdlPromise, timeoutPromise]);
             if (Array.isArray(playdlResults)) {
                 rawList = playdlResults.map(v => ({
                     id: v.id,
@@ -459,7 +469,7 @@ async function searchMusic(
                 })).filter(v => v.id && v.title);
             }
         } catch (playErr) {
-            console.error(`[play-dl] search failed for "${searchQuery}":`, playErr.message);
+            // Both providers handled
         }
     }
 

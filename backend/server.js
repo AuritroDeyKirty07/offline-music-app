@@ -930,8 +930,10 @@ app.post(
                 req.body.officialOnly ===
                 true;
 
+            const topTitles = (titles || []).slice(0, 8);
+
             const promises =
-                titles.map(
+                topTitles.map(
                     title =>
                         searchMusic(
                             title,

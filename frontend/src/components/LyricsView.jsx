@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import { Clock, Plus, Minus } from 'lucide-react';
+import { API_BASE } from '../constants';
 
 export default function LyricsView({ currentSong, currentTime }) {
   const [lyrics, setLyrics] = useState(null);
@@ -25,7 +26,7 @@ export default function LyricsView({ currentSong, currentTime }) {
     
     // Fetch saved offset
     if (currentSong?.id) {
-        fetch(`http://localhost:5000/api/lyrics/offset/${currentSong.id}`)
+        fetch(`${API_BASE}/lyrics/offset/${currentSong.id}`)
             .then(res => res.json())
             .then(data => {
                 if (data.offset) setSyncOffset(data.offset);
@@ -66,7 +67,7 @@ export default function LyricsView({ currentSong, currentTime }) {
       setError(null);
       setLyrics(null);
       try {
-        const res = await fetch(`http://localhost:5000/api/lyrics?title=${encodeURIComponent(currentSong.title)}&author=${encodeURIComponent(currentSong.author)}`);
+        const res = await fetch(`${API_BASE}/lyrics?title=${encodeURIComponent(currentSong.title)}&author=${encodeURIComponent(currentSong.author)}`);
         
         if (res.ok) {
             const data = await res.json();
@@ -154,7 +155,7 @@ export default function LyricsView({ currentSong, currentTime }) {
           
           // Save to backend persistently
           if (currentSong?.id) {
-              fetch('http://localhost:5000/api/lyrics/offset', {
+              fetch(`${API_BASE}/lyrics/offset`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ id: currentSong.id, offset: newOffset })

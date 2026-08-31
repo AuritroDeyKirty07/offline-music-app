@@ -3,9 +3,7 @@ import axios from 'axios';
 import { Search, Play, Shuffle, Library } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = 'http://localhost:5000/api';
-
-import { defaultPrefs, artistsList, genresList, interestsList, languagesList } from './constants';
+import { API_BASE, defaultPrefs, artistsList, genresList, interestsList, languagesList } from './constants';
 import Sidebar from './components/Sidebar';
 import SongCard from './components/SongCard';
 import MusicPlayer from './components/MusicPlayer';

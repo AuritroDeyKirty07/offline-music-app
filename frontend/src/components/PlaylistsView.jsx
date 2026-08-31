@@ -3,6 +3,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Play, ListMusic, MoreVertical, X, Shuffle, Check } from 'lucide-react';
 import SongCard from './SongCard';
+import { API_BASE } from '../constants';
 
 export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, setQueueIndex, executePlay, formatDuration, playingSongId }) {
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -25,7 +26,7 @@ export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, set
     if (!newPlaylistName.trim()) return;
     
     try {
-        await axios.post('http://localhost:5000/api/playlists', { name: newPlaylistName });
+        await axios.post(`${API_BASE}/playlists`, { name: newPlaylistName });
         setNewPlaylistName('');
         fetchPlaylists();
     } catch (err) {
@@ -35,7 +36,7 @@ export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, set
 
   const deletePlaylist = async (id) => {
       try {
-          await axios.delete(`http://localhost:5000/api/playlists/${id}`);
+          await axios.delete(`${API_BASE}/playlists/${id}`);
           if (selectedPlaylist?.id === id) setSelectedPlaylist(null);
           fetchPlaylists();
       } catch (err) {
@@ -45,7 +46,7 @@ export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, set
   
   const removeSong = async (songId) => {
       try {
-          await axios.delete(`http://localhost:5000/api/playlists/${selectedPlaylist.id}/songs/${songId}`);
+          await axios.delete(`${API_BASE}/playlists/${selectedPlaylist.id}/songs/${songId}`);
           fetchPlaylists();
           setSelectedPlaylist(prev => ({
               ...prev,
@@ -82,7 +83,7 @@ export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, set
       setIsSuggesting(true);
       
       try {
-          const res = await axios.post('http://localhost:5000/api/ai-home-recommendations', {
+          const res = await axios.post(`${API_BASE}/ai-home-recommendations`, {
               library: selectedPlaylist.songs
           });
           setSuggestedSongs(res.data);
@@ -103,7 +104,7 @@ export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, set
       const songsToAdd = suggestedSongs.filter(s => selectedToAdd.has(s.id));
       for (const song of songsToAdd) {
           try {
-              await axios.post(`http://localhost:5000/api/playlists/${selectedPlaylist.id}/songs`, { song });
+              await axios.post(`${API_BASE}/playlists/${selectedPlaylist.id}/songs`, { song });
           } catch(e) { console.error(e); }
       }
       fetchPlaylists();

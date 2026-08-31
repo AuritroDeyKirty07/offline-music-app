@@ -655,7 +655,7 @@ app.post(
             if (targetUrl) {
                 return res.json({
                     status: 'streaming',
-                    url: targetUrl
+                    url: `${BASE_URL}/api/stream/${encodeURIComponent(songInfo.id)}`
                 });
             }
 
@@ -692,6 +692,11 @@ app.get(
         try {
             const id = req.params.id;
 
+            // CORS Headers for Web Audio API & HTML5 Audio
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', '*');
+
             // 1. FAST LOCAL DISK PLAYBACK: If song exists on disk, stream directly from disk!
             const existingFile = await findExistingFile(id);
             if (existingFile) {
@@ -727,7 +732,7 @@ app.get(
                 }
             }
 
-            // 2. ONLINE DIRECT REDIRECT STREAM
+            // 2. ONLINE STREAM PROXY (WITH RANGE SUPPORT & CORS)
             const targetUrl = await extractStreamUrl(id);
 
             if (!targetUrl) {
@@ -736,11 +741,45 @@ app.get(
                     .json({ error: 'Stream not found' });
             }
 
-            return res.redirect(302, targetUrl);
+            const fetchHeaders = {};
+            if (req.headers.range) {
+                fetchHeaders.Range = req.headers.range;
+            }
+
+            const streamRes = await fetch(targetUrl, {
+                method: 'GET',
+                headers: fetchHeaders
+            });
+
+            if (!streamRes.ok && streamRes.status !== 206) {
+                return res.status(streamRes.status || 500).end();
+            }
+
+            const contentType = streamRes.headers.get('content-type') || 'audio/webm';
+            res.setHeader('Content-Type', contentType);
+
+            const acceptRanges = streamRes.headers.get('accept-ranges') || 'bytes';
+            res.setHeader('Accept-Ranges', acceptRanges);
+
+            const contentLength = streamRes.headers.get('content-length');
+            if (contentLength) res.setHeader('Content-Length', contentLength);
+
+            const contentRange = streamRes.headers.get('content-range');
+            if (contentRange) res.setHeader('Content-Range', contentRange);
+
+            res.status(streamRes.status);
+
+            if (streamRes.body) {
+                Readable.fromWeb(streamRes.body).pipe(res);
+            } else {
+                res.end();
+            }
 
         } catch (error) {
             console.error('Streaming error:', error.message);
-            res.status(500).json({ error: 'Streaming failed' });
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Streaming failed' });
+            }
         }
     }
 );

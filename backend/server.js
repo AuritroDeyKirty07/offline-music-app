@@ -574,7 +574,8 @@ async function extractStreamUrl(id) {
     let realId = id;
     if (id.startsWith('ai_')) {
         try {
-            const rawQuery = Buffer.from(id.replace('ai_', ''), 'hex').toString('utf8');
+            const rawHex = id.replace('ai_', '');
+            const rawQuery = Buffer.from(rawHex, 'hex').toString('utf8');
             const searchResults = await searchMusic(rawQuery, 1, false);
             if (searchResults && searchResults.length > 0) {
                 realId = searchResults[0].id;
@@ -584,23 +585,22 @@ async function extractStreamUrl(id) {
 
     const youtubeUrl = `https://www.youtube.com/watch?v=${realId}`;
 
-    // 1. Try youtube-dl-exec with ffmpeg-static
+    // 1. Try youtube-dl-exec direct stream URL
     try {
-        const info = await youtubedl(youtubeUrl, {
-            dumpSingleJson: true,
-            format: 'bestaudio/best',
-            ffmpegLocation: ffmpegPath,
+        const directUrl = await youtubedl(youtubeUrl, {
+            getUrl: true,
+            format: 'bestaudio',
             noWarnings: true
         });
 
-        const directUrl = info.url || info.requested_formats?.[0]?.url || (info.formats && info.formats.find(f => f.acodec !== 'none' && f.url)?.url);
-        if (directUrl) {
-            setCachedStreamUrl(id, directUrl);
-            setCachedStreamUrl(realId, directUrl);
-            return directUrl;
+        if (directUrl && typeof directUrl === 'string' && directUrl.startsWith('http')) {
+            const cleanUrl = directUrl.trim().split('\n')[0];
+            setCachedStreamUrl(id, cleanUrl);
+            setCachedStreamUrl(realId, cleanUrl);
+            return cleanUrl;
         }
     } catch (e) {
-        console.error('Stream extraction failed for:', realId, e.message);
+        console.error('Stream extraction getUrl failed for:', realId, e.message);
     }
 
     // 2. Try play-dl fallback

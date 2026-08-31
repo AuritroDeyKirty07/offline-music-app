@@ -92,7 +92,15 @@ export default function QueueView({ queue, setQueue, queueIndex, setQueueIndex, 
                             <GripVertical size={20} />
                           </div>
                           
-                          <img src={song.thumbnail} alt={song.title} className="w-14 h-14 rounded-lg object-cover shadow-md" />
+                          <img 
+                            src={song.thumbnail} 
+                            alt={song.title} 
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop';
+                            }}
+                            className="w-14 h-14 rounded-lg object-cover shadow-md" 
+                          />
                           
                           <div className="flex-1 min-w-0">
                             <p className={`font-bold truncate ${isPlaying ? 'text-[#1ed760]' : 'text-white'}`}>

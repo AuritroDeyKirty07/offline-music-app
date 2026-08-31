@@ -40,7 +40,15 @@ export default function MusicPlayer({
         {currentSong ? (
           <div className="flex items-center group w-full min-w-0">
             <div className="relative h-12 w-12 shrink-0 rounded-md overflow-hidden mr-3 border border-white/10 shadow-sm">
-              <img src={currentSong.thumbnail} alt="cover" className="w-full h-full object-cover" />
+              <img 
+                src={currentSong.thumbnail} 
+                alt="cover" 
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop';
+                }}
+                className="w-full h-full object-cover" 
+              />
             </div>
             <div className="flex flex-col justify-center min-w-0 flex-1">
               <p className="text-zinc-100 text-sm font-semibold truncate hover:underline cursor-pointer leading-tight" title={currentSong.title}>{currentSong.title}</p>

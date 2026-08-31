@@ -273,22 +273,22 @@ const FALLBACK_BY_LANGUAGE = {
 function detectSongLanguage(title = '', author = '', hintLang = '') {
     const text = `${title} ${author}`.toLowerCase();
     
-    // Check Punjabi
+    // Check Punjabi artists & keywords
     const isPunjabi = (CURATED_ARTISTS.Punjabi || []).some(a => text.includes(a.toLowerCase())) ||
-        text.includes('punjabi') || text.includes('speed records') || text.includes('apna punjab') || text.includes('sidhu') || text.includes('aujla');
+        text.includes('punjabi') || text.includes('speed records') || text.includes('apna punjab') || text.includes('sidhu') || text.includes('aujla') || text.includes('dhillon') || text.includes('cheema') || text.includes('shubh') || text.includes('diljit') || text.includes('jordan sandhu') || text.includes('wazir patar');
     if (isPunjabi) return 'Punjabi';
+
+    // Check Hindi artists & keywords
+    const isHindi = (CURATED_ARTISTS.Hindi || []).some(a => text.includes(a.toLowerCase())) ||
+        text.includes('arijit') || text.includes('anuv jain') || text.includes('pritam') || text.includes('t-series') || text.includes('tips official') || text.includes('saregama') || text.includes('badshah') || text.includes('king') || text.includes('honey singh') || text.includes('seedhe maut');
+    if (isHindi) return 'Hindi';
 
     // Check English
     const isEnglish = (CURATED_ARTISTS.English || []).some(a => text.includes(a.toLowerCase())) ||
-        text.includes('charlie puth') || text.includes('weeknd') || text.includes('taylor swift') || text.includes('ed sheeran') || text.includes('bieber') || text.includes('vevo');
+        text.includes('charlie puth') || text.includes('weeknd') || text.includes('taylor swift') || text.includes('ed sheeran') || text.includes('bieber') || text.includes('dua lipa') || text.includes('drake') || text.includes('vevo');
     if (isEnglish) return 'English';
 
-    // Check Hindi
-    const isHindi = (CURATED_ARTISTS.Hindi || []).some(a => text.includes(a.toLowerCase())) ||
-        text.includes('arijit') || text.includes('anuv jain') || text.includes('pritam') || text.includes('t-series') || text.includes('tips official') || text.includes('saregama');
-    if (isHindi) return 'Hindi';
-
-    return hintLang || 'English';
+    return hintLang || 'Punjabi';
 }
 
 async function getAiAutoplayRecommendations(title, author, language = 'English', prefs = {}) {
@@ -296,13 +296,14 @@ async function getAiAutoplayRecommendations(title, author, language = 'English',
     const detectedLang = detectSongLanguage(title, author, language);
     const cacheKey = `autoplay_${title}_${author}_${detectedLang}_${(artists || []).slice(0, 3).join('_')}`;
 
-    let prompt = `I am currently listening to the track "${title}" by artist "${author}".
-The language and genre context of this track is STRICTLY "${detectedLang}".
-STRICT RULES:
-1. All recommended songs MUST be distinct, single tracks in the SAME LANGUAGE ("${detectedLang}") with matching style/vibe.
-2. DO NOT return any songs from other languages (e.g. if the song is English, DO NOT return Hindi or Punjabi songs).
-3. DO NOT return alternate versions, lyrics videos, covers, or remixes of "${title}".
-4. DO NOT return any compilations, album collections, or jukeboxes.
+    let prompt = `You are a music playlist curator.
+The user is currently listening to "${title}" by "${author}".
+The language of this track is STRICTLY "${detectedLang}".
+
+CRITICAL RULE:
+- ALL recommended songs MUST be 100% in "${detectedLang}" language.
+- DO NOT mix or include songs from other languages under any circumstances! (e.g. If the song is Punjabi, EVERY recommended song MUST be a Punjabi song).
+- ONLY recommend individual single tracks. DO NOT include compilations, albums, or jukeboxes.
 `;
     if (artists && artists.length > 0) {
         prompt += `User preference artists: ${artists.join(', ')}.\n`;
@@ -324,7 +325,7 @@ The response must STRICTLY be a plain JSON array of strings formatted like ["Son
     }
 
     // High quality distinct tracks fallback strictly matching language
-    const fallbackList = FALLBACK_BY_LANGUAGE[detectedLang] || FALLBACK_BY_LANGUAGE['English'];
+    const fallbackList = FALLBACK_BY_LANGUAGE[detectedLang] || FALLBACK_BY_LANGUAGE['Punjabi'];
     return fallbackList;
 }
 
@@ -332,21 +333,30 @@ async function getAiHomeRecommendations(prefs = {}) {
     const { artists = [], genres = [], interests = [], languages = [], library = [] } = prefs;
     const cacheKey = `home_${JSON.stringify(prefs)}`;
 
-    let prompt = `I need exactly 20 diverse individual music single recommendations tailored to these preferences:\n`;
+    const selectedLangs = Array.isArray(languages) && languages.length > 0 ? languages : ['Punjabi'];
+    const langStr = selectedLangs.join(' and ');
+
+    let prompt = `You are an elite music curation AI.
+CRITICAL LANGUAGE REQUIREMENT: ONLY recommend songs in the following language(s): "${langStr}".
+IF THE USER CHOSE PUNJABI, 100% OF THE SONGS MUST BE PUNJABI TRACKS! NEVER RETURN ENGLISH OR HINDI SONGS UNLESS SPECIFICALLY REQUESTED.
+
+User Preferences:
+`;
     if (artists.length) prompt += `- Favorite Artists: ${artists.join(', ')}\n`;
     if (genres.length) prompt += `- Genres: ${genres.join(', ')}\n`;
     if (interests.length) prompt += `- Moods/Interests: ${interests.join(', ')}\n`;
-    if (languages.length) prompt += `- Languages: ${languages.join(', ')}\n`;
+    if (languages.length) prompt += `- STRICT Language(s): ${langStr}\n`;
     if (library.length) {
         const libraryTitles = library.map(s => `${s.title} by ${s.author}`).slice(0, 10);
         prompt += `- Recently listened: ${libraryTitles.join(', ')}\n`;
     }
 
     prompt += `\nSTRICT RULES:
-- ONLY recommend individual single tracks. DO NOT include compilations, albums, or jukeboxes.
-- Return EXACTLY 20 song titles.
-- The response should STRICTLY be a plain JSON array of strings containing ONLY the song titles along with their primary artist, e.g., ["Song Name - Artist Name", "Another Song - Artist"].
-- Do not wrap it in markdown code blocks. Just valid JSON array.`;
+1. ONLY return songs strictly in the language(s) "${langStr}". Zero exceptions!
+2. ONLY recommend individual single tracks. DO NOT include compilations, albums, or jukeboxes.
+3. Return EXACTLY 20 song titles formatted as "Song Title - Artist Name".
+4. The response should STRICTLY be a plain JSON array of strings, e.g., ["Song Name - Artist Name", "Another Song - Artist"].
+5. Do not wrap in markdown code blocks. Just valid JSON array.`;
 
     try {
         const rawText = await generateWithFailover(prompt, cacheKey);
@@ -359,8 +369,8 @@ async function getAiHomeRecommendations(prefs = {}) {
     }
 
     // Dynamic curated home mix based on languages
-    const primaryLang = (languages && languages[0]) || 'English';
-    const langTracks = FALLBACK_BY_LANGUAGE[primaryLang] || FALLBACK_BY_LANGUAGE['English'];
+    const primaryLang = (languages && languages[0]) || 'Punjabi';
+    const langTracks = FALLBACK_BY_LANGUAGE[primaryLang] || FALLBACK_BY_LANGUAGE['Punjabi'];
     return langTracks;
 }
 

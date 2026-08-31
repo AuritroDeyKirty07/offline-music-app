@@ -737,7 +737,15 @@ function App() {
                       setQueueIndex(queueIndex + idx);
                       executePlay(s);
                     }}>
-                      <img src={s.thumbnail} alt={s.title} className="w-12 h-12 rounded object-cover" />
+                      <img 
+                        src={s.thumbnail} 
+                        alt={s.title} 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop';
+                        }}
+                        className="w-12 h-12 rounded object-cover" 
+                      />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-semibold truncate ${idx === 0 ? 'text-[#1ed760]' : 'text-white'}`}>{s.title}</p>
                         <p className="text-xs text-zinc-400 truncate">{s.author}</p>

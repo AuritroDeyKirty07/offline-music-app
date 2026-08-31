@@ -18,7 +18,15 @@ export default function SongCard({ song, activeTab, playingSongId, playSong, han
       }}
     >
       <div className="relative aspect-square md:aspect-video mb-3 rounded-lg overflow-hidden shadow-md">
-        <img src={song.thumbnail} alt={song.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        <img 
+          src={song.thumbnail} 
+          alt={song.title} 
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop';
+          }}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+        />
         
         {/* Play Overlay */}
         <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>

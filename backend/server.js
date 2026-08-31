@@ -561,7 +561,18 @@ async function extractStreamUrl(id) {
     const cached = getCachedStreamUrl(id);
     if (cached) return cached;
 
-    const youtubeUrl = `https://www.youtube.com/watch?v=${id}`;
+    let realId = id;
+    if (id.startsWith('ai_')) {
+        try {
+            const rawQuery = Buffer.from(id.replace('ai_', ''), 'hex').toString('utf8');
+            const searchResults = await searchMusic(rawQuery, 1, false);
+            if (searchResults && searchResults.length > 0) {
+                realId = searchResults[0].id;
+            }
+        } catch (e) {}
+    }
+
+    const youtubeUrl = `https://www.youtube.com/watch?v=${realId}`;
 
     // 1. Try youtube-dl-exec with ffmpeg-static
     try {
@@ -575,10 +586,11 @@ async function extractStreamUrl(id) {
         const directUrl = info.url || info.requested_formats?.[0]?.url || (info.formats && info.formats.find(f => f.acodec !== 'none' && f.url)?.url);
         if (directUrl) {
             setCachedStreamUrl(id, directUrl);
+            setCachedStreamUrl(realId, directUrl);
             return directUrl;
         }
     } catch (e) {
-        console.error('Stream extraction failed for:', id, e.message);
+        console.error('Stream extraction failed for:', realId, e.message);
     }
 
     // 2. Try play-dl fallback
@@ -587,6 +599,7 @@ async function extractStreamUrl(id) {
         const streamInfo = await playdl.stream_from_info(videoInfo, { quality: 2 });
         if (streamInfo && streamInfo.url) {
             setCachedStreamUrl(id, streamInfo.url);
+            setCachedStreamUrl(realId, streamInfo.url);
             return streamInfo.url;
         }
     } catch (e) {
@@ -604,50 +617,35 @@ app.post(
     '/api/play',
     async (req, res) => {
         try {
-            const songInfo =
-                req.body.song;
+            let songInfo = req.body.song;
+            const shouldDownload = req.body.download;
 
-            const shouldDownload =
-                req.body.download;
-
-            if (
-                !songInfo ||
-                !songInfo.id
-            ) {
-                return res
-                    .status(400)
-                    .json({
-                        error:
-                            'Invalid song info'
-                    });
+            if (!songInfo || !songInfo.id) {
+                return res.status(400).json({ error: 'Invalid song info' });
             }
 
-            const existingFile =
-                await findExistingFile(
-                    songInfo.id
-                );
+            // If this is an AI placeholder track, resolve to real YouTube ID
+            if (songInfo.id.startsWith('ai_')) {
+                const query = `${songInfo.title} ${songInfo.author}`;
+                const searchResults = await searchMusic(query, 1, false);
+                if (searchResults && searchResults.length > 0) {
+                    songInfo = { ...searchResults[0], ...songInfo, id: searchResults[0].id, thumbnail: searchResults[0].thumbnail || songInfo.thumbnail };
+                }
+            }
+
+            const existingFile = await findExistingFile(songInfo.id);
 
             if (existingFile) {
                 return res.json({
                     status: 'ready',
-                    url:
-                        `${BASE_URL}/downloads/${encodeURIComponent(
-                            existingFile
-                        )}`
+                    url: `${BASE_URL}/downloads/${encodeURIComponent(existingFile)}`
                 });
             }
 
             if (shouldDownload) {
-                downloadSong(
-                    songInfo
-                ).catch(
-                    error => {
-                        console.error(
-                            'Background download error:',
-                            error.message
-                        );
-                    }
-                );
+                downloadSong(songInfo).catch(error => {
+                    console.error('Background download error:', error.message);
+                });
             }
 
             return res.json({
@@ -656,17 +654,8 @@ app.post(
             });
 
         } catch (error) {
-            console.error(
-                'Download/Stream error:',
-                error
-            );
-
-            res
-                .status(500)
-                .json({
-                    error:
-                        'Failed to process song'
-                });
+            console.error('Download/Stream error:', error);
+            res.status(500).json({ error: 'Failed to process song' });
         }
     }
 );
@@ -879,65 +868,46 @@ app.post(
     async (req, res) => {
         try {
             const titles = await getAiHomeRecommendations(req.body);
+            const officialOnly = req.body.officialOnly === true;
+            const topTitles = (titles || []).slice(0, 20);
 
-            const officialOnly =
-                req.body.officialOnly ===
-                true;
+            // Fast parallel metadata resolution with 1.2s timeout per search
+            const resolvePromises = topTitles.map(async (rawTitle) => {
+                try {
+                    const searchResult = await Promise.race([
+                        searchMusic(rawTitle, 1, officialOnly),
+                        new Promise(resolve => setTimeout(() => resolve([]), 1200))
+                    ]);
 
-            const topTitles = (titles || []).slice(0, 16);
-
-            const promises = topTitles.map(title =>
-                Promise.race([
-                    searchMusic(title, 1, officialOnly),
-                    new Promise(resolve => setTimeout(() => resolve([]), 2500))
-                ])
-            );
-
-            const resultsArray = await Promise.allSettled(promises);
-
-            const combined = [];
-
-            resultsArray.forEach(
-                result => {
-                    if (
-                        result.status ===
-                            'fulfilled' &&
-                        result.value &&
-                        result.value.length >
-                            0
-                    ) {
-                        combined.push(
-                            result.value[0]
-                        );
+                    if (searchResult && searchResult.length > 0) {
+                        return searchResult[0];
                     }
+                } catch (e) {}
+
+                // Instant fallback song card if search is throttled on cloud IP
+                let parsedTitle = rawTitle;
+                let parsedAuthor = 'Various Artists';
+                if (rawTitle.includes(' - ')) {
+                    const parts = rawTitle.split(' - ');
+                    parsedTitle = parts[0].trim();
+                    parsedAuthor = parts.slice(1).join(' - ').trim();
                 }
-            );
 
-            const uniqueMap =
-                new Map();
+                const safeHex = Buffer.from(rawTitle).toString('hex');
+                return {
+                    id: `ai_${safeHex}`,
+                    title: parsedTitle,
+                    author: parsedAuthor,
+                    thumbnail: `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop`,
+                    duration: '3:30',
+                    isDownloaded: false
+                };
+            });
 
-            combined.forEach(
-                song => {
-                    if (
-                        !uniqueMap.has(
-                            song.id
-                        )
-                    ) {
-                        uniqueMap.set(
-                            song.id,
-                            song
-                        );
-                    }
-                }
-            );
+            const resolvedSongs = await Promise.all(resolvePromises);
+            const validSongs = resolvedSongs.filter(Boolean);
 
-            let finalResults = Array.from(uniqueMap.values());
-            if (finalResults.length === 0) {
-                console.log('[AI Home] Falling back to database recommendations');
-                finalResults = await getRecommendations(req.body);
-            }
-
-            res.json(finalResults);
+            res.json(validSongs.length > 0 ? validSongs : await getRecommendations(req.body));
 
         } catch (error) {
             console.error(

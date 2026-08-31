@@ -197,7 +197,7 @@ function App() {
     if (!query.trim()) return;
     setIsSearching(true);
     try {
-      const res = await axios.get(`${API_BASE}/search?q=${query}`);
+      const res = await axios.get(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
       setResults(res.data);
     } catch (err) {
       console.error(err);

@@ -158,10 +158,22 @@ function App() {
       const res = await axios.post(`${API_BASE}/ai-home-recommendations`, {
         ...currentPrefs,
         library: currentLib
-      }, { timeout: 60000 }); // Increase timeout since 40 songs takes time
-      setRecommendations(res.data);
+      }, { timeout: 12000 });
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setRecommendations(res.data);
+        return;
+      }
     } catch (err) {
-      console.error('Failed to fetch recommendations', err);
+      console.warn('AI recommendations delayed, fetching instant fallback:', err.message);
+    }
+
+    try {
+      const fb = await axios.get(`${API_BASE}/recommendations`, { timeout: 8000 });
+      if (fb.data && Array.isArray(fb.data) && fb.data.length > 0) {
+        setRecommendations(fb.data);
+      }
+    } catch (e) {
+      console.error('Failed to load fallback recommendations', e);
     }
   };
 

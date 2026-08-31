@@ -61,64 +61,45 @@ async function generateWithFailover(prompt, cacheKey = null) {
 
     apiKeys = getApiKeys();
     const totalKeys = apiKeys.length;
-    const totalModels = CANDIDATE_MODELS.length;
+    const modelName = 'gemini-3.6-flash';
 
     let lastError = null;
 
-    // Try all models in order of priority
-    for (let m = 0; m < totalModels; m++) {
-        const modelName = CANDIDATE_MODELS[(currentModelIndex + m) % totalModels];
+    // Try up to 2 keys on the working gemini-3.6-flash model
+    for (let k = 0; k < Math.min(totalKeys, 2); k++) {
+        const keyIndex = (currentKeyIndex + k) % totalKeys;
+        const apiKey = apiKeys[keyIndex];
 
-        // Try all keys in pool for this model
-        for (let k = 0; k < totalKeys; k++) {
-            const keyIndex = (currentKeyIndex + k) % totalKeys;
-            const apiKey = apiKeys[keyIndex];
+        if (!apiKey || apiKey === 'dummy_key') continue;
 
-            if (!apiKey || apiKey === 'dummy_key') continue;
+        try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: modelName });
 
-            try {
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: modelName });
+            const callPromise = model.generateContent(prompt);
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Gemini API request timed out (7s)')), 7000)
+            );
 
-                const callPromise = model.generateContent(prompt);
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Gemini API request timed out (5s)')), 5000)
-                );
+            const result = await Promise.race([callPromise, timeoutPromise]);
+            const text = result.response.text().trim();
 
-                const result = await Promise.race([callPromise, timeoutPromise]);
-                const text = result.response.text().trim();
+            currentKeyIndex = keyIndex;
 
-                // On success, remember working key and model
-                currentKeyIndex = keyIndex;
-                currentModelIndex = (currentModelIndex + m) % totalModels;
-
-                if (cacheKey) {
-                    responseCache.set(cacheKey, { timestamp: Date.now(), data: text });
-                }
-
-                return text;
-            } catch (err) {
-                lastError = err;
-                const errMsg = err.message || '';
-                const isRateLimitOrQuota = errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('QuotaExceeded');
-                const isHighDemandOrUnavailable = errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('Unavailable') || errMsg.includes('timed out');
-                const isInvalidKey = errMsg.includes('API_KEY_INVALID') || errMsg.includes('403');
-
-                console.warn(`[GeminiService] Key ${keyIndex + 1}/${totalKeys} on ${modelName} issue: ${err.message?.slice(0, 100)}`);
-
-                if (isRateLimitOrQuota || isHighDemandOrUnavailable || isInvalidKey) {
-                    // Rotate to next key immediately
-                    continue;
-                } else {
-                    // Other errors (e.g. model not found), break to try next model
-                    break;
-                }
+            if (cacheKey) {
+                responseCache.set(cacheKey, { timestamp: Date.now(), data: text });
             }
+
+            return text;
+        } catch (err) {
+            lastError = err;
+            console.warn(`[GeminiService] Key ${keyIndex + 1}/${totalKeys} on ${modelName} error:`, err.message?.slice(0, 80));
+            continue;
         }
     }
 
-    console.warn(`[GeminiService] All API keys/models exhausted. Last: ${lastError?.message?.slice(0, 80)}`);
-    throw lastError || new Error('All Gemini API keys and fallback models failed');
+    console.warn(`[GeminiService] Gemini calls failed, using instant curated fallback`);
+    throw lastError || new Error('All Gemini API calls failed');
 }
 
 // ============================================================

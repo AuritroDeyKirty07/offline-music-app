@@ -156,7 +156,7 @@ function App() {
       const res = await axios.post(`${API_BASE}/ai-home-recommendations`, {
         ...currentPrefs,
         library: currentLib
-      }, { timeout: 45000 });
+      }, { timeout: 60000 });
       if (res.data && Array.isArray(res.data) && res.data.length > 0) {
         setRecommendations(res.data);
         return;

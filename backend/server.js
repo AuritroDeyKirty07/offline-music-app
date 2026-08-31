@@ -884,22 +884,16 @@ app.post(
                 req.body.officialOnly ===
                 true;
 
-            const topTitles = (titles || []).slice(0, 20);
+            const topTitles = (titles || []).slice(0, 16);
 
-            const promises =
-                topTitles.map(
-                    title =>
-                        searchMusic(
-                            title,
-                            1,
-                            officialOnly
-                        )
-                );
+            const promises = topTitles.map(title =>
+                Promise.race([
+                    searchMusic(title, 1, officialOnly),
+                    new Promise(resolve => setTimeout(() => resolve([]), 2500))
+                ])
+            );
 
-            const resultsArray =
-                await Promise.allSettled(
-                    promises
-                );
+            const resultsArray = await Promise.allSettled(promises);
 
             const combined = [];
 

@@ -60,46 +60,39 @@ async function generateWithFailover(prompt, cacheKey = null) {
     }
 
     apiKeys = getApiKeys();
-    const totalKeys = apiKeys.length;
+    const validKeys = apiKeys.filter(k => k && k !== 'dummy_key');
     const modelName = 'gemini-3.6-flash';
 
-    let lastError = null;
-
-    // Try all keys on the working gemini-3.6-flash model
-    for (let k = 0; k < totalKeys; k++) {
-        const keyIndex = (currentKeyIndex + k) % totalKeys;
-        const apiKey = apiKeys[keyIndex];
-
-        if (!apiKey || apiKey === 'dummy_key') continue;
-
-        try {
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: modelName });
-
-            const callPromise = model.generateContent(prompt);
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Gemini API request timed out (12s)')), 12000)
-            );
-
-            const result = await Promise.race([callPromise, timeoutPromise]);
-            const text = result.response.text().trim();
-
-            currentKeyIndex = keyIndex;
-
-            if (cacheKey) {
-                responseCache.set(cacheKey, { timestamp: Date.now(), data: text });
-            }
-
-            return text;
-        } catch (err) {
-            lastError = err;
-            console.warn(`[GeminiService] Key ${keyIndex + 1}/${totalKeys} on ${modelName} error:`, err.message?.slice(0, 80));
-            continue;
-        }
+    if (validKeys.length === 0) {
+        throw new Error('No valid Gemini API keys configured');
     }
 
-    console.warn(`[GeminiService] Gemini calls failed, using instant curated fallback`);
-    throw lastError || new Error('All Gemini API calls failed');
+    try {
+        // Race all valid keys concurrently for instant sub-3s response!
+        const racePromises = validKeys.map(async (apiKey, idx) => {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const callPromise = model.generateContent(prompt);
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error(`Key ${idx + 1} timed out (18s)`)), 18000)
+            );
+            const result = await Promise.race([callPromise, timeoutPromise]);
+            const text = result.response.text().trim();
+            return { text, idx };
+        });
+
+        const winner = await Promise.any(racePromises);
+        console.log(`[GeminiService] Key ${winner.idx + 1}/${validKeys.length} won race!`);
+
+        if (cacheKey) {
+            responseCache.set(cacheKey, { timestamp: Date.now(), data: winner.text });
+        }
+
+        return winner.text;
+    } catch (err) {
+        console.warn(`[GeminiService] All parallel key calls failed:`, err.message);
+        throw err;
+    }
 }
 
 // ============================================================

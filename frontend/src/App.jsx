@@ -156,22 +156,13 @@ function App() {
       const res = await axios.post(`${API_BASE}/ai-home-recommendations`, {
         ...currentPrefs,
         library: currentLib
-      }, { timeout: 60000 });
+      }, { timeout: 90000 });
       if (res.data && Array.isArray(res.data) && res.data.length > 0) {
         setRecommendations(res.data);
         return;
       }
     } catch (err) {
-      console.warn('AI recommendations error, checking fallback:', err.message);
-    }
-
-    try {
-      const fb = await axios.get(`${API_BASE}/recommendations`, { timeout: 15000 });
-      if (fb.data && Array.isArray(fb.data) && fb.data.length > 0) {
-        setRecommendations(fb.data);
-      }
-    } catch (e) {
-      console.error('Failed to load fallback recommendations', e);
+      console.error('Failed to load AI recommendations:', err.message);
     }
   };
 

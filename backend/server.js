@@ -779,7 +779,7 @@ app.get(
 async function resolveTrackList(titles, officialOnly = false) {
     const results = [];
     const uniqueIds = new Set();
-    const chunkSize = 4;
+    const chunkSize = 2;
 
     for (let i = 0; i < titles.length; i += chunkSize) {
         const chunk = titles.slice(i, i + chunkSize);
@@ -828,7 +828,7 @@ app.post(
                 { artists, genres }
             );
 
-            const topTitles = (titles || []).slice(0, 8);
+            const topTitles = (titles || []).slice(0, 6);
             const resolvedSongs = await resolveTrackList(topTitles, false);
 
             res.json(resolvedSongs);
@@ -850,25 +850,15 @@ app.post(
         try {
             const titles = await getAiHomeRecommendations(req.body);
             const officialOnly = req.body.officialOnly === true;
-            const topTitles = (titles || []).slice(0, 16);
+            const topTitles = (titles || []).slice(0, 8);
 
             const resolvedSongs = await resolveTrackList(topTitles, officialOnly);
 
-            let finalResults = resolvedSongs;
-            if (finalResults.length === 0) {
-                finalResults = await getRecommendations(req.body);
-            }
-
-            res.json(finalResults);
+            res.json(resolvedSongs);
 
         } catch (error) {
             console.error('AI Home Recommendation Error:', error.message);
-            try {
-                const fallbackResults = await getRecommendations(req.body);
-                return res.json(fallbackResults);
-            } catch (e) {
-                res.status(500).json({ error: 'Failed to generate AI home recommendations' });
-            }
+            res.status(500).json({ error: 'Failed to generate AI home recommendations' });
         }
     }
 );

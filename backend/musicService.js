@@ -490,6 +490,11 @@ async function searchMusic(
             }
         }
 
+        // Filter out short audio edits / shorts (< 60 seconds)
+        if (v.seconds && v.seconds < 60 && !lowerQ.includes('edit') && !lowerQ.includes('short')) {
+            return false;
+        }
+
         // If user explicitly searched for remix/status, do not filter it out
         if (!lowerQ.includes('remix') && !lowerQ.includes('status')) {
             const isSpam = SPAM_CHANNELS.some(spam => titleLower.includes(spam) || authorLower.includes(spam));

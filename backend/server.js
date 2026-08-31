@@ -643,8 +643,8 @@ app.post(
                 }
             }
 
+            // 1. If downloaded file exists, return ready
             const existingFile = await findExistingFile(songInfo.id);
-
             if (existingFile) {
                 return res.json({
                     status: 'ready',
@@ -652,11 +652,15 @@ app.post(
                 });
             }
 
+            // 2. Trigger background download if requested
             if (shouldDownload) {
                 downloadSong(songInfo).catch(error => {
                     console.error('Background download error:', error.message);
                 });
             }
+
+            // 3. Pre-warm direct stream URL in cache before responding
+            await extractStreamUrl(songInfo.id);
 
             return res.json({
                 status: 'streaming',

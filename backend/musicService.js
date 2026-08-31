@@ -409,9 +409,7 @@ async function searchMusic(
     if (lowerQ === 'wavy') {
         searchQuery = 'wavy karan aujla';
     } else if (officialOnly && !lowerQ.includes('official') && !lowerQ.includes('audio')) {
-        searchQuery = `${cleanQuery} official audio`;
-    } else if (!lowerQ.includes('audio') && !lowerQ.includes('video') && !lowerQ.includes('song')) {
-        searchQuery = `${cleanQuery} song`;
+        searchQuery = `${cleanQuery} official`;
     }
 
     const cacheKey = `${searchQuery}_${limit}_${officialOnly}`;

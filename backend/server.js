@@ -783,7 +783,7 @@ app.get(
 async function resolveTrackList(titles, officialOnly = false) {
     const results = [];
     const uniqueIds = new Set();
-    const chunkSize = 2;
+    const chunkSize = 3;
 
     for (let i = 0; i < titles.length; i += chunkSize) {
         const chunk = titles.slice(i, i + chunkSize);
@@ -832,7 +832,7 @@ app.post(
                 { artists, genres }
             );
 
-            const topTitles = (titles || []).slice(0, 6);
+            const topTitles = (titles || []).slice(0, 8);
             const resolvedSongs = await resolveTrackList(topTitles, false);
 
             res.json(resolvedSongs);
@@ -854,7 +854,7 @@ app.post(
         try {
             const titles = await getAiHomeRecommendations(req.body);
             const officialOnly = req.body.officialOnly === true;
-            const topTitles = (titles || []).slice(0, 8);
+            const topTitles = (titles || []).slice(0, 16);
 
             const resolvedSongs = await resolveTrackList(topTitles, officialOnly);
 

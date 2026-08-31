@@ -42,21 +42,26 @@ export default function HomeScreen() {
         setLoading(true);
         const prefs: any = await getPreferences();
         try {
-            const res = await api.get('/recommendations', {
-    params: {
-        prefs: JSON.stringify({
-            artists: prefs.artists || [],
-            genres: prefs.genres || [],
-            interests: [],
-            languages: prefs.languages || [],
-            library: [],
-            officialOnly: prefs.officialOnly === true
-        })
-    }
-});
-            setRecommendations(res.data);
+            const res = await api.post('/ai-home-recommendations', {
+                artists: prefs.artists || [],
+                genres: prefs.genres || [],
+                interests: [],
+                languages: prefs.languages || ['Hindi', 'English'],
+                library: [],
+                officialOnly: prefs.officialOnly === true
+            }, { timeout: 35000 });
+
+            if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+                setRecommendations(res.data);
+            }
         } catch (e) {
-            console.error("Failed to fetch recs", e);
+            console.error("Failed to fetch AI home recs, checking fallback", e);
+            try {
+                const fb = await api.get('/recommendations', { timeout: 15000 });
+                if (fb.data && Array.isArray(fb.data) && fb.data.length > 0) {
+                    setRecommendations(fb.data);
+                }
+            } catch (err) {}
         }
         setLoading(false);
     };

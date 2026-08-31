@@ -65,8 +65,8 @@ async function generateWithFailover(prompt, cacheKey = null) {
 
     let lastError = null;
 
-    // Try up to 2 keys on the working gemini-3.6-flash model
-    for (let k = 0; k < Math.min(totalKeys, 2); k++) {
+    // Try all keys on the working gemini-3.6-flash model
+    for (let k = 0; k < totalKeys; k++) {
         const keyIndex = (currentKeyIndex + k) % totalKeys;
         const apiKey = apiKeys[keyIndex];
 
@@ -78,7 +78,7 @@ async function generateWithFailover(prompt, cacheKey = null) {
 
             const callPromise = model.generateContent(prompt);
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Gemini API request timed out (7s)')), 7000)
+                setTimeout(() => reject(new Error('Gemini API request timed out (12s)')), 12000)
             );
 
             const result = await Promise.race([callPromise, timeoutPromise]);

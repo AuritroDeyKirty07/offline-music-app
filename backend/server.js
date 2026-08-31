@@ -773,65 +773,36 @@ app.get(
 );
 
 // ============================================================
-// METADATA RESOLVER (OFFICIAL HIGH-RES STUDIO ALBUM ART)
+// METADATA RESOLVER (REAL YOUTUBE IDs & REAL COVER ART)
 // ============================================================
 
-async function resolveTrackMetadata(rawTitle, officialOnly = false) {
-    // 1. Try fast local search / YouTube cache first (800ms)
-    try {
-        const searchResult = await Promise.race([
-            searchMusic(rawTitle, 1, officialOnly),
-            new Promise(resolve => setTimeout(() => resolve([]), 800))
-        ]);
+async function resolveTrackList(titles, officialOnly = false) {
+    const results = [];
+    const uniqueIds = new Set();
+    const chunkSize = 4;
 
-        if (searchResult && searchResult.length > 0) {
-            return searchResult[0];
-        }
-    } catch (e) {}
+    for (let i = 0; i < titles.length; i += chunkSize) {
+        const chunk = titles.slice(i, i + chunkSize);
+        const chunkPromises = chunk.map(async (rawTitle) => {
+            try {
+                const searchResults = await searchMusic(rawTitle, 1, officialOnly);
+                if (searchResults && searchResults.length > 0) {
+                    return searchResults[0];
+                }
+            } catch (e) {}
+            return null;
+        });
 
-    // 2. Fetch genuine studio album cover art from iTunes (< 600ms)
-    let parsedTitle = rawTitle;
-    let parsedAuthor = 'Various Artists';
-    if (rawTitle.includes(' - ')) {
-        const parts = rawTitle.split(' - ');
-        parsedTitle = parts[0].trim();
-        parsedAuthor = parts.slice(1).join(' - ').trim();
+        const resolvedChunk = await Promise.all(chunkPromises);
+        resolvedChunk.filter(Boolean).forEach(song => {
+            if (!uniqueIds.has(song.id)) {
+                uniqueIds.add(song.id);
+                results.push(song);
+            }
+        });
     }
 
-    try {
-        const itunesRes = await Promise.race([
-            fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(rawTitle)}&media=music&limit=1`),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 800))
-        ]);
-
-        if (itunesRes && itunesRes.ok) {
-            const data = await itunesRes.json();
-            const track = data.results && data.results[0];
-            if (track && track.artworkUrl100) {
-                const hdArtwork = track.artworkUrl100.replace('100x100bb', '600x600bb');
-                const durationSec = Math.floor((track.trackTimeMillis || 210000) / 1000);
-                const durationStr = `${Math.floor(durationSec / 60)}:${(durationSec % 60).toString().padStart(2, '0')}`;
-                return {
-                    id: `ai_${Buffer.from(rawTitle).toString('hex')}`,
-                    title: track.trackName || parsedTitle,
-                    author: track.artistName || parsedAuthor,
-                    thumbnail: hdArtwork,
-                    duration: durationStr,
-                    isDownloaded: false
-                };
-            }
-        }
-    } catch (e) {}
-
-    // 3. Clean fallback card
-    return {
-        id: `ai_${Buffer.from(rawTitle).toString('hex')}`,
-        title: parsedTitle,
-        author: parsedAuthor,
-        thumbnail: `https://picsum.photos/seed/${encodeURIComponent(parsedTitle)}/400/400`,
-        duration: '3:30',
-        isDownloaded: false
-    };
+    return results;
 }
 
 // ============================================================
@@ -853,22 +824,14 @@ app.post(
             const titles = await getAiAutoplayRecommendations(
                 title || '',
                 author || '',
-                language || 'English',
+                language || 'Punjabi',
                 { artists, genres }
             );
 
-            const topTitles = (titles || []).slice(0, 10);
-            const promises = topTitles.map(songTitle => resolveTrackMetadata(songTitle, false));
-            const results = await Promise.all(promises);
+            const topTitles = (titles || []).slice(0, 8);
+            const resolvedSongs = await resolveTrackList(topTitles, false);
 
-            const uniqueMap = new Map();
-            results.filter(Boolean).forEach(song => {
-                if (!uniqueMap.has(song.id)) {
-                    uniqueMap.set(song.id, song);
-                }
-            });
-
-            res.json(Array.from(uniqueMap.values()));
+            res.json(resolvedSongs);
 
         } catch (error) {
             console.error('AI Autoplay Batch Error:', error.message);
@@ -887,20 +850,11 @@ app.post(
         try {
             const titles = await getAiHomeRecommendations(req.body);
             const officialOnly = req.body.officialOnly === true;
-            const topTitles = (titles || []).slice(0, 20);
+            const topTitles = (titles || []).slice(0, 16);
 
-            // Parallel metadata resolution with real studio album art
-            const resolvePromises = topTitles.map(rawTitle => resolveTrackMetadata(rawTitle, officialOnly));
-            const resolvedSongs = await Promise.all(resolvePromises);
+            const resolvedSongs = await resolveTrackList(topTitles, officialOnly);
 
-            const uniqueMap = new Map();
-            resolvedSongs.filter(Boolean).forEach(song => {
-                if (!uniqueMap.has(song.id)) {
-                    uniqueMap.set(song.id, song);
-                }
-            });
-
-            let finalResults = Array.from(uniqueMap.values());
+            let finalResults = resolvedSongs;
             if (finalResults.length === 0) {
                 finalResults = await getRecommendations(req.body);
             }

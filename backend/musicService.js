@@ -421,11 +421,11 @@ async function searchMusic(
 
     let rawList = [];
 
-    // 1. Try yt-search with safe string extraction & 2.5s timeout
+    // 1. Try yt-search with safe string extraction & 6s timeout
     try {
         const searchPromise = ytSearch(searchQuery);
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('ytSearch timed out (2.5s)')), 2500)
+            setTimeout(() => reject(new Error('ytSearch timed out (6s)')), 6000)
         );
 
         const r = await Promise.race([searchPromise, timeoutPromise]);

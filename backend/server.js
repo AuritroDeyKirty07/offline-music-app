@@ -654,12 +654,8 @@ app.post(
 
             if (targetUrl) {
                 return res.json({
-                    status:
-                        'streaming',
-                    url:
-                        `${BASE_URL}/api/stream/${encodeURIComponent(
-                            songInfo.id
-                        )}`
+                    status: 'streaming',
+                    url: targetUrl
                 });
             }
 
@@ -731,95 +727,20 @@ app.get(
                 }
             }
 
-            // 2. ONLINE PROXY STREAM
+            // 2. ONLINE DIRECT REDIRECT STREAM
             const targetUrl = await extractStreamUrl(id);
 
             if (!targetUrl) {
                 return res
                     .status(404)
-                    .end();
+                    .json({ error: 'Stream not found' });
             }
 
-            const headers = {};
-
-            if (
-                req.headers.range
-            ) {
-                headers.Range =
-                    req.headers.range;
-            }
-
-            const streamRes =
-                await fetch(
-                    targetUrl,
-                    {
-                        method: 'GET',
-                        headers
-                    }
-                );
-
-            if (
-                !streamRes.ok &&
-                streamRes.status !==
-                    206
-            ) {
-                return res
-                    .status(500)
-                    .end();
-            }
-
-            [
-                'content-type',
-                'content-length',
-                'accept-ranges',
-                'content-range'
-            ].forEach(
-                header => {
-                    const value =
-                        streamRes
-                            .headers
-                            .get(
-                                header
-                            );
-
-                    if (value) {
-                        res.setHeader(
-                            header,
-                            value
-                        );
-                    }
-                }
-            );
-
-            res.status(
-                streamRes.status
-            );
-
-            if (
-                streamRes.body
-            ) {
-                Readable
-                    .fromWeb(
-                        streamRes.body
-                    )
-                    .pipe(res);
-            } else {
-                res.end();
-            }
+            return res.redirect(302, targetUrl);
 
         } catch (error) {
-            console.error(
-                'Proxy stream error:',
-                error.message
-            );
-
-            if (
-                !res.headersSent
-            ) {
-                res
-                    .status(500)
-                    .end();
-            }
+            console.error('Streaming error:', error.message);
+            res.status(500).json({ error: 'Streaming failed' });
         }
     }
 );

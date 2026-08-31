@@ -650,21 +650,10 @@ app.post(
                 );
             }
 
-            const targetUrl = await extractStreamUrl(songInfo.id);
-
-            if (targetUrl) {
-                return res.json({
-                    status: 'streaming',
-                    url: `${BASE_URL}/api/stream/${encodeURIComponent(songInfo.id)}`
-                });
-            }
-
-            res
-                .status(500)
-                .json({
-                    error:
-                        'Failed to extract streaming URL'
-                });
+            return res.json({
+                status: 'streaming',
+                url: `${BASE_URL}/api/stream/${encodeURIComponent(songInfo.id)}`
+            });
 
         } catch (error) {
             console.error(

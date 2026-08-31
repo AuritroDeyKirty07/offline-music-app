@@ -59,6 +59,16 @@ const BASE_URL =
 
 app.use(cors());
 
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    next();
+});
+
 app.use(
     express.json({
         limit: '2mb'
@@ -763,6 +773,68 @@ app.get(
 );
 
 // ============================================================
+// METADATA RESOLVER (OFFICIAL HIGH-RES STUDIO ALBUM ART)
+// ============================================================
+
+async function resolveTrackMetadata(rawTitle, officialOnly = false) {
+    // 1. Try fast local search / YouTube cache first (800ms)
+    try {
+        const searchResult = await Promise.race([
+            searchMusic(rawTitle, 1, officialOnly),
+            new Promise(resolve => setTimeout(() => resolve([]), 800))
+        ]);
+
+        if (searchResult && searchResult.length > 0) {
+            return searchResult[0];
+        }
+    } catch (e) {}
+
+    // 2. Fetch genuine studio album cover art from iTunes (< 600ms)
+    let parsedTitle = rawTitle;
+    let parsedAuthor = 'Various Artists';
+    if (rawTitle.includes(' - ')) {
+        const parts = rawTitle.split(' - ');
+        parsedTitle = parts[0].trim();
+        parsedAuthor = parts.slice(1).join(' - ').trim();
+    }
+
+    try {
+        const itunesRes = await Promise.race([
+            fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(rawTitle)}&media=music&limit=1`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 800))
+        ]);
+
+        if (itunesRes && itunesRes.ok) {
+            const data = await itunesRes.json();
+            const track = data.results && data.results[0];
+            if (track && track.artworkUrl100) {
+                const hdArtwork = track.artworkUrl100.replace('100x100bb', '600x600bb');
+                const durationSec = Math.floor((track.trackTimeMillis || 210000) / 1000);
+                const durationStr = `${Math.floor(durationSec / 60)}:${(durationSec % 60).toString().padStart(2, '0')}`;
+                return {
+                    id: `ai_${Buffer.from(rawTitle).toString('hex')}`,
+                    title: track.trackName || parsedTitle,
+                    author: track.artistName || parsedAuthor,
+                    thumbnail: hdArtwork,
+                    duration: durationStr,
+                    isDownloaded: false
+                };
+            }
+        }
+    } catch (e) {}
+
+    // 3. Clean fallback card
+    return {
+        id: `ai_${Buffer.from(rawTitle).toString('hex')}`,
+        title: parsedTitle,
+        author: parsedAuthor,
+        thumbnail: `https://picsum.photos/seed/${encodeURIComponent(parsedTitle)}/400/400`,
+        duration: '3:30',
+        isDownloaded: false
+    };
+}
+
+// ============================================================
 // AI AUTOPLAY
 // ============================================================
 
@@ -785,76 +857,22 @@ app.post(
                 { artists, genres }
             );
 
-            const topTitles = (titles || []).slice(0, 8);
+            const topTitles = (titles || []).slice(0, 10);
+            const promises = topTitles.map(songTitle => resolveTrackMetadata(songTitle, false));
+            const results = await Promise.all(promises);
 
-            const promises =
-                topTitles.map(
-                    songTitle =>
-                        searchMusic(
-                            songTitle,
-                            1
-                        )
-                );
-
-            const resultsArray =
-                await Promise.allSettled(
-                    promises
-                );
-
-            const combined = [];
-
-            resultsArray.forEach(
-                result => {
-                    if (
-                        result.status ===
-                            'fulfilled' &&
-                        result.value &&
-                        result.value.length >
-                            0
-                    ) {
-                        combined.push(
-                            result.value[0]
-                        );
-                    }
+            const uniqueMap = new Map();
+            results.filter(Boolean).forEach(song => {
+                if (!uniqueMap.has(song.id)) {
+                    uniqueMap.set(song.id, song);
                 }
-            );
+            });
 
-            const uniqueMap =
-                new Map();
-
-            combined.forEach(
-                song => {
-                    if (
-                        !uniqueMap.has(
-                            song.id
-                        )
-                    ) {
-                        uniqueMap.set(
-                            song.id,
-                            song
-                        );
-                    }
-                }
-            );
-
-            res.json(
-                Array.from(
-                    uniqueMap.values()
-                )
-            );
+            res.json(Array.from(uniqueMap.values()));
 
         } catch (error) {
-            console.error(
-                'AI Autoplay Batch Error:',
-                error
-            );
-
-            res
-                .status(500)
-                .json({
-                    error:
-                        'Failed to generate AI autoplay batch'
-                });
+            console.error('AI Autoplay Batch Error:', error.message);
+            res.status(500).json({ error: 'Failed to generate AI autoplay batch' });
         }
     }
 );
@@ -871,60 +889,31 @@ app.post(
             const officialOnly = req.body.officialOnly === true;
             const topTitles = (titles || []).slice(0, 20);
 
-            // Fast parallel metadata resolution with 1.2s timeout per search
-            const resolvePromises = topTitles.map(async (rawTitle) => {
-                try {
-                    const searchResult = await Promise.race([
-                        searchMusic(rawTitle, 1, officialOnly),
-                        new Promise(resolve => setTimeout(() => resolve([]), 1200))
-                    ]);
+            // Parallel metadata resolution with real studio album art
+            const resolvePromises = topTitles.map(rawTitle => resolveTrackMetadata(rawTitle, officialOnly));
+            const resolvedSongs = await Promise.all(resolvePromises);
 
-                    if (searchResult && searchResult.length > 0) {
-                        return searchResult[0];
-                    }
-                } catch (e) {}
-
-                // Instant fallback song card if search is throttled on cloud IP
-                let parsedTitle = rawTitle;
-                let parsedAuthor = 'Various Artists';
-                if (rawTitle.includes(' - ')) {
-                    const parts = rawTitle.split(' - ');
-                    parsedTitle = parts[0].trim();
-                    parsedAuthor = parts.slice(1).join(' - ').trim();
+            const uniqueMap = new Map();
+            resolvedSongs.filter(Boolean).forEach(song => {
+                if (!uniqueMap.has(song.id)) {
+                    uniqueMap.set(song.id, song);
                 }
-
-                const safeHex = Buffer.from(rawTitle).toString('hex');
-                return {
-                    id: `ai_${safeHex}`,
-                    title: parsedTitle,
-                    author: parsedAuthor,
-                    thumbnail: `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop`,
-                    duration: '3:30',
-                    isDownloaded: false
-                };
             });
 
-            const resolvedSongs = await Promise.all(resolvePromises);
-            const validSongs = resolvedSongs.filter(Boolean);
+            let finalResults = Array.from(uniqueMap.values());
+            if (finalResults.length === 0) {
+                finalResults = await getRecommendations(req.body);
+            }
 
-            res.json(validSongs.length > 0 ? validSongs : await getRecommendations(req.body));
+            res.json(finalResults);
 
         } catch (error) {
-            console.error(
-                'AI Home Recommendation Error:',
-                error.message
-            );
-
+            console.error('AI Home Recommendation Error:', error.message);
             try {
                 const fallbackResults = await getRecommendations(req.body);
                 return res.json(fallbackResults);
             } catch (e) {
-                res
-                    .status(500)
-                    .json({
-                        error:
-                            'Failed to generate AI home recommendations'
-                    });
+                res.status(500).json({ error: 'Failed to generate AI home recommendations' });
             }
         }
     }

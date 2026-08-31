@@ -292,7 +292,12 @@ function App() {
       // Safari/Chrome require context to be created/resumed on user gesture
       initAudioContext();
       audio.crossOrigin = 'anonymous'; // Important for Web Audio API with external URLs
-      audio.play();
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => {
+          if (e.name !== 'AbortError') console.error('Audio playback error:', e);
+        });
+      }
       setIsPlaying(true);
       fetchLibrary();
     } catch (err) {
@@ -314,8 +319,10 @@ function App() {
     let currentList = [];
     if (activeTab === 'library') {
       currentList = library;
+    } else if (activeTab === 'home') {
+      currentList = recommendations && recommendations.length > 0 ? recommendations : [song];
     } else {
-      currentList = [song];
+      currentList = results && results.length > 0 ? results : [song];
     }
 
     const idx = currentList.findIndex(s => s.id === song.id);

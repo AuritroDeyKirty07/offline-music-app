@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const {
     GoogleGenerativeAI
@@ -48,10 +49,28 @@ const app =
 const PORT =
     process.env.PORT || 5000;
 
-const BASE_URL =
-    process.env.PUBLIC_URL ||
-    process.env.RENDER_EXTERNAL_URL ||
-    `http://localhost:${PORT}`;
+function getBaseUrl(req) {
+    if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL;
+    if (req) {
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+        const host = req.get('host') || `localhost:${PORT}`;
+        return `${protocol}://${host}`;
+    }
+    return `http://localhost:${PORT}`;
+}
+
+function getLocalIpAddresses() {
+    const interfaces = os.networkInterfaces();
+    const addresses = [];
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                addresses.push({ name, address: iface.address });
+            }
+        }
+    }
+    return addresses;
+}
 
 // ============================================================
 // MIDDLEWARE
@@ -67,6 +86,22 @@ app.use((req, res, next) => {
         return res.status(200).end();
     }
     next();
+});
+
+// Auto Network Discovery endpoints for Mobile & Web clients
+app.get('/api/ping', (req, res) => {
+    res.json({ ok: true, server: 'Chord-PC-Server', timestamp: Date.now() });
+});
+
+app.get('/api/server-info', (req, res) => {
+    res.json({
+        ok: true,
+        server: 'Chord-PC-Server',
+        hostname: os.hostname(),
+        port: PORT,
+        interfaces: getLocalIpAddresses(),
+        baseUrl: getBaseUrl(req)
+    });
 });
 
 app.use(
@@ -648,7 +683,7 @@ app.post(
             if (existingFile) {
                 return res.json({
                     status: 'ready',
-                    url: `${BASE_URL}/downloads/${encodeURIComponent(existingFile)}`
+                    url: `${getBaseUrl(req)}/downloads/${encodeURIComponent(existingFile)}`
                 });
             }
 
@@ -664,7 +699,7 @@ app.post(
 
             return res.json({
                 status: 'streaming',
-                url: `${BASE_URL}/api/stream/${encodeURIComponent(songInfo.id)}`
+                url: `${getBaseUrl(req)}/api/stream/${encodeURIComponent(songInfo.id)}`
             });
 
         } catch (error) {
@@ -1384,16 +1419,16 @@ app.listen(
     PORT,
     '0.0.0.0',
     () => {
-        console.log(
-            `Backend server running on ${BASE_URL}`
-        );
-
-        console.log(
-            `Download directory: ${DOWNLOAD_DIR}`
-        );
-
-        console.log(
-            `Data directory: ${DATA_DIR}`
-        );
+        console.log(`\n🎵 ===============================================`);
+        console.log(`🚀 Chord Local PC Server running on port ${PORT}`);
+        console.log(`📡 Active Local Network Endpoints (Wi-Fi & LAN):`);
+        console.log(`   • Local:   http://localhost:${PORT}`);
+        const addrs = getLocalIpAddresses();
+        addrs.forEach(a => {
+            console.log(`   • ${a.name}: http://${a.address}:${PORT}`);
+        });
+        console.log(`📂 Download directory: ${DOWNLOAD_DIR}`);
+        console.log(`📂 Data directory:     ${DATA_DIR}`);
+        console.log(`🎵 ===============================================\n`);
     }
 );

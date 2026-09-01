@@ -493,6 +493,20 @@ async function searchMusic(
             return false;
         }
 
+        // Filter out lyric videos unless user explicitly searched for lyrics
+        if (!lowerQ.includes('lyric')) {
+            if (titleLower.includes('lyric video') || titleLower.includes('lyrical video') || titleLower.includes('lyrics video') || titleLower.includes('with lyrics')) {
+                return false;
+            }
+        }
+
+        // Filter out unplugged / acoustic covers unless user explicitly searched for it
+        if (!lowerQ.includes('unplugged') && !lowerQ.includes('acoustic') && !lowerQ.includes('cover')) {
+            if (titleLower.includes('unplugged') || titleLower.includes('acoustic cover') || titleLower.includes('cover by') || titleLower.includes('cover song')) {
+                return false;
+            }
+        }
+
         // If user explicitly searched for remix/status, do not filter it out
         if (!lowerQ.includes('remix') && !lowerQ.includes('status')) {
             const isSpam = SPAM_CHANNELS.some(spam => titleLower.includes(spam) || authorLower.includes(spam));
@@ -657,11 +671,12 @@ function downloadSong(songInfo) {
                 await youtubedl(
                     `https://www.youtube.com/watch?v=${id}`,
                     {
-                        format: 'bestaudio',
+                        format: 'bestaudio/best',
                         output: outputPath,
                         x: true,
                         audioFormat: 'mp3',
                         ffmpegLocation: ffmpegPath,
+                        concurrentFragments: 4,
                         noCheckCertificates: true,
                         noWarnings: true
                     }

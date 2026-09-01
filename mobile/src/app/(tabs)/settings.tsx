@@ -180,7 +180,7 @@ export default function SettingsScreen() {
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Server & Connection</Text>
-                <Text style={styles.settingSub}>Backend API Base URL (Local Laptop or Cloud):</Text>
+                <Text style={styles.settingSub}>Backend PC Server API URL (Auto-discovers on Wi-Fi/LAN):</Text>
                 <TextInput 
                     style={styles.serverInput}
                     value={serverUrl}
@@ -228,10 +228,10 @@ export default function SettingsScreen() {
                 </View>
 
                 <View style={styles.serverHelpBox}>
-                    <Text style={styles.serverHelpHeader}>Quick Formats:</Text>
-                    <Text style={styles.serverHelpItem}>• Wi-Fi (Laptop): http://192.168.X.X:5000/api</Text>
-                    <Text style={styles.serverHelpItem}>• USB (ADB): http://localhost:5000/api</Text>
-                    <Text style={styles.serverHelpItem}>• Cloud Server: https://your-app.onrender.com/api</Text>
+                    <Text style={styles.serverHelpHeader}>Connection Modes:</Text>
+                    <Text style={styles.serverHelpItem}>• Wi-Fi / Ethernet LAN: Auto-detected by Chord Server</Text>
+                    <Text style={styles.serverHelpItem}>• USB Cable (ADB): http://localhost:5000/api</Text>
+                    <Text style={styles.serverHelpItem}>• Local Hotspot / IP: http://192.168.X.X:5000/api</Text>
                 </View>
             </View>
         </ScrollView>

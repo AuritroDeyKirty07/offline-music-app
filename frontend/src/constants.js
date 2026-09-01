@@ -1,4 +1,6 @@
-export const API_BASE = import.meta.env.VITE_API_URL || 'https://chord-j7vn.onrender.com/api';
+export const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+  ? `http://${window.location.hostname}:5000/api`
+  : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
 
 export const defaultPrefs = {
   artists: [],
@@ -8,18 +10,15 @@ export const defaultPrefs = {
 };
 
 export const artistsList = [
-  'Arijit Singh', 'Taylor Swift', 'The Weeknd', 'Ed Sheeran', 'Drake', 
-  'Badshah', 'Diljit Dosanjh', 'Justin Bieber', 'Billie Eilish', 'AR Rahman',
-  'Bruno Mars', 'Shreya Ghoshal', 'Atif Aslam', 'Dua Lipa', 'Post Malone',
-  'Sonu Nigam', 'Kishore Kumar', 'Lata Mangeshkar', 'Kumar Sanu', 'Alka Yagnik',
-  'Udit Narayan', 'Neha Kakkar', 'Jubin Nautiyal', 'Darshan Raval', 'Guru Randhawa',
-  'Honey Singh', 'Eminem', 'Rihanna', 'Beyonce', 'Adele',
-  'Katy Perry', 'Ariana Grande', 'Selena Gomez', 'Shawn Mendes', 'Charlie Puth',
-  'Harry Styles', 'Zayn Malik', 'Sia', 'David Guetta', 'Calvin Harris',
-  'Karan Aujla', 'Sidhu Moose Wala', 'AP Dhillon', 'Divine', 'Krsna',
-  'Armaan Malik', 'Mika Singh', 'Sunidhi Chauhan', 'Shaan', 'KK',
-  'Coldplay', 'Imagine Dragons', 'Maroon 5', 'One Direction', 'BTS',
-  'Blackpink', 'Alan Walker', 'Marshmello', 'Martin Garrix', 'DJ Snake'
+  'Karan Aujla', 'Shubh', 'Cheema Y', 'Sidhu Moose Wala', 'Diljit Dosanjh', 'AP Dhillon',
+  'Arijit Singh', 'Taylor Swift', 'The Weeknd', 'Ed Sheeran', 'Drake', 'Bruno Mars',
+  'Shreya Ghoshal', 'Atif Aslam', 'Dua Lipa', 'Post Malone', 'Sonu Nigam', 'Anuv Jain',
+  'Seedhe Maut', 'KR$NA', 'Divine', 'Badshah', 'Honey Singh', 'Pritam', 'Vishal Mishra',
+  'Darshan Raval', 'Guru Randhawa', 'Justin Bieber', 'Billie Eilish', 'AR Rahman',
+  'Charlie Puth', 'Harry Styles', 'Zayn Malik', 'Travis Scott', 'Kendrick Lamar', 'Olivia Rodrigo',
+  'Eminem', 'Rihanna', 'Adele', 'Katy Perry', 'Ariana Grande', 'Selena Gomez',
+  'Coldplay', 'Imagine Dragons', 'Alan Walker', 'Marshmello', 'Martin Garrix', 'DJ Snake',
+  'Masoom Sharma', 'Gulzaar Chhaniwala', 'Renuka Panwar', 'Bad Bunny', 'BTS', 'BLACKPINK'
 ];
 
 export const genresList = [

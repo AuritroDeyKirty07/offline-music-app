@@ -244,21 +244,19 @@ export default function LibraryScreen() {
                         {downloads.length > 0 && (
                             <View style={styles.controlsRow}>
                                 <TouchableOpacity
-                                    style={styles.playAllBtn}
-                                    onPress={() => playSongList(downloads, 0)}
-                                    activeOpacity={0.8}
-                                >
-                                    <Play color="black" size={15} fill="currentColor" />
-                                    <Text style={styles.playAllText}>Play All</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
                                     style={styles.shuffleBtn}
                                     onPress={() => playSongList(downloads, 0, true)}
                                     activeOpacity={0.8}
                                 >
-                                    <Shuffle color="white" size={15} />
-                                    <Text style={styles.shuffleText}>Shuffle</Text>
+                                    <Shuffle color="white" size={18} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.playAllBtn}
+                                    onPress={() => playSongList(downloads, 0)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Play color="black" size={18} fill="black" style={{ marginLeft: 2 }} />
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -424,18 +422,18 @@ export default function LibraryScreen() {
                         {selectedPlaylist?.songs?.length > 0 && (
                             <View style={styles.controlsRow}>
                                 <TouchableOpacity
-                                    style={styles.playAllBtn}
-                                    onPress={() => playSongList(selectedPlaylist.songs, 0)}
-                                >
-                                    <Play color="black" size={15} fill="currentColor" />
-                                    <Text style={styles.playAllText}>Play All</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
                                     style={styles.shuffleBtn}
                                     onPress={() => playSongList(selectedPlaylist.songs, 0, true)}
+                                    activeOpacity={0.8}
                                 >
-                                    <Shuffle color="white" size={15} />
-                                    <Text style={styles.shuffleText}>Shuffle</Text>
+                                    <Shuffle color="white" size={18} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.playAllBtn}
+                                    onPress={() => playSongList(selectedPlaylist.songs, 0)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Play color="black" size={18} fill="black" style={{ marginLeft: 2 }} />
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -540,35 +538,29 @@ const styles = StyleSheet.create({
     },
     controlsRow: {
         flexDirection: 'row',
-        gap: 8,
+        alignItems: 'center',
+        gap: 10,
     },
     playAllBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         backgroundColor: '#1ed760',
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 20,
-        gap: 6,
-    },
-    playAllText: {
-        color: 'black',
-        fontSize: 13,
-        fontWeight: 'bold',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#1ed760',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+        elevation: 4,
     },
     shuffleBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         backgroundColor: 'rgba(255, 255, 255, 0.12)',
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 20,
-        gap: 6,
-    },
-    shuffleText: {
-        color: 'white',
-        fontSize: 13,
-        fontWeight: '600',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     likedSongsCard: {
         flexDirection: 'row',

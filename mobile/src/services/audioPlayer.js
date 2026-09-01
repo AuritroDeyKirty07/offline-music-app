@@ -14,6 +14,8 @@ import { getOfflineSong } from './offlineStorage';
 
 import { getPreferences } from './preferences';
 
+import { updateMediaNotification, dismissMediaNotification } from './notificationPlayer';
+
 const AudioContext = createContext({});
 
 export const useAudioPlayer = () => useContext(AudioContext);
@@ -64,6 +66,14 @@ export const AudioProvider = ({ children }) => {
     useEffect(() => {
         isShuffleRef.current = isShuffle;
     }, [isShuffle]);
+
+    useEffect(() => {
+        if (currentSong) {
+            updateMediaNotification(currentSong, isPlaying);
+        } else {
+            dismissMediaNotification();
+        }
+    }, [currentSong, isPlaying]);
 
     useEffect(() => {
         return sound

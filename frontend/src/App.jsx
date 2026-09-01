@@ -272,67 +272,79 @@ function App() {
     setPlayingSongId(song.id);
     setCurrentSong(song); 
     
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = ''; 
-    }
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-
-    try {
-      const res = await axios.post(`${API_BASE}/play`, { song, download: isOfflineMode }, { timeout: 60000 });
-      if (latestPlayId.current !== currentPlayId) return;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      // Fast path: Immediately set stream or download URL without waiting
+      const isDownloaded = song.isDownloaded || (library || []).some(s => s.id === song.id);
+      const matchedLibSong = (library || []).find(s => s.id === song.id);
+      let audioUrl = `${API_BASE}/stream/${encodeURIComponent(song.id)}`;
+      if (isDownloaded && matchedLibSong && (matchedLibSong.fileExt || matchedLibSong.filename)) {
+        audioUrl = `${API_BASE}/downloads/${encodeURIComponent(matchedLibSong.fileExt || matchedLibSong.filename)}`;
+      } else if (song.url) {
+        audioUrl = song.url;
+      }
       
-      const audio = audioRef.current;
-      audio.src = res.data.url;
-      // Safari/Chrome require context to be created/resumed on user gesture
+      audio.src = audioUrl;
       initAudioContext();
-      audio.crossOrigin = 'anonymous'; // Important for Web Audio API with external URLs
+      audio.crossOrigin = 'anonymous';
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch(e => {
           if (e.name !== 'AbortError') console.error('Audio playback error:', e);
         });
       }
-      setIsPlaying(true);
-      fetchLibrary();
-    } catch (err) {
-      if (latestPlayId.current === currentPlayId) {
-        console.error('Failed to play/download song, auto-skipping...', err);
-        // Auto-skip to the next song if this one is blocked/restricted by YouTube
-        setTimeout(() => {
-          handlePlayNext();
-        }, 1000);
-      }
-    } finally {
-      if (latestPlayId.current === currentPlayId) {
-        setPlayingSongId(null);
-      }
     }
+    
+    setIsPlaying(true);
+    setCurrentTime(0);
+    setDuration(0);
+    setPlayingSongId(null);
+
+    // Non-blocking background call for auto-download if enabled
+    axios.post(`${API_BASE}/play`, { song, download: isOfflineMode }).then(() => {
+      fetchLibrary();
+    }).catch(err => {
+      console.warn('Background play sync:', err?.message || err);
+    });
   };
 
   const playSong = (song) => {
-    let currentList = [];
     if (activeTab === 'library') {
-      currentList = library;
-    } else if (activeTab === 'home') {
-      currentList = recommendations && recommendations.length > 0 ? recommendations : [song];
-    } else {
-      currentList = results && results.length > 0 ? results : [song];
+      const idx = (library || []).findIndex(s => s.id === song.id);
+      setQueue(library);
+      setQueueIndex(idx !== -1 ? idx : 0);
+      executePlay(song);
+      return;
     }
 
-    const idx = currentList.findIndex(s => s.id === song.id);
-    if (idx !== -1) {
-        setQueue(currentList);
-        setQueueIndex(idx);
-    } else {
-        setQueue([song]);
-        setQueueIndex(0);
-    }
-    
-    setPendingAiTitles([]); // Reset AI queue context
+    // 1. For any song clicked from Home, Search, or Taste:
+    // Initialize queue with ONLY this song and play immediately!
+    setQueue([song]);
+    setQueueIndex(0);
     executePlay(song);
+
+    // 2. Asynchronously fetch AI personalized recommendations in background
+    if (isAutoplay) {
+      const prefLang = (prefs.languages && prefs.languages.length > 0) ? prefs.languages[0] : 'Hindi';
+      axios.post(`${API_BASE}/ai-recommend`, {
+        title: song.title,
+        author: song.author,
+        language: prefLang,
+        artists: prefs.artists || [],
+        genres: prefs.genres || []
+      }, { timeout: 30000 }).then(res => {
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setQueue(prev => {
+            const existingIds = new Set(prev.map(s => s.id));
+            const newTracks = res.data.filter(s => !existingIds.has(s.id));
+            return [...prev, ...newTracks];
+          });
+        }
+      }).catch(err => {
+        console.warn('Background AI queue generation error:', err?.message || err);
+      });
+    }
   };
   
   const handlePlayNext = async () => {

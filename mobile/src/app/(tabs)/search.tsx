@@ -117,28 +117,23 @@ export default function SearchScreen() {
         }
     };
 
-    const handlePlaySearchItem = async (item: any, idx?: number) => {
-        const initialIndex = idx !== undefined && idx >= 0 ? idx : results.findIndex(s => s.id === item.id);
-        const startIdx = initialIndex >= 0 ? initialIndex : 0;
-        const initialQueue = results.length > 0 ? results : [item];
+    const handlePlaySearchItem = async (item: any) => {
+        // 1. Play searched song immediately with ONLY this song (do not dump search results)
+        playSong(item, [item], 0);
 
-        // 1. Play searched song and immediately populate queue with search results
-        playSong(item, initialQueue, startIdx);
-
-        // 2. Fetch AI recommended tracks in background to extend queue
+        // 2. Fetch AI recommended tracks in background to dynamically build queue
         try {
             const prefs: any = await getPreferences();
             const res = await api.post('/ai-recommend', {
                 title: item.title,
                 author: item.author,
-                language: (prefs.languages && prefs.languages[0]) || 'English',
+                language: (prefs.languages && prefs.languages[0]) || 'Hindi',
                 artists: prefs.artists || [],
                 genres: prefs.genres || []
-            }, { timeout: 15000 });
+            }, { timeout: 25000 });
 
             if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
-                const existingIds = new Set(initialQueue.map(s => s.id));
-                const filtered = res.data.filter((s: any) => !existingIds.has(s.id));
+                const filtered = res.data.filter((s: any) => s.id !== item.id);
                 if (filtered.length > 0) {
                     appendToQueue(filtered);
                 }

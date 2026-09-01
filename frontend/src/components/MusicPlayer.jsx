@@ -6,6 +6,7 @@ export default function MusicPlayer({
   currentSong,
   isPlaying,
   playingSongId,
+  isBuffering,
   isAutoplay,
   setIsAutoplay,
   handlePlayPrevious,
@@ -49,9 +50,19 @@ export default function MusicPlayer({
                 }}
                 className="w-full h-full object-cover" 
               />
+              {isBuffering && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-[#1ed760] rounded-full animate-spin"></div>
+                </div>
+              )}
             </div>
             <div className="flex flex-col justify-center min-w-0 flex-1">
-              <p className="text-zinc-100 text-sm font-semibold truncate hover:underline cursor-pointer leading-tight" title={currentSong.title}>{currentSong.title}</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-zinc-100 text-sm font-semibold truncate hover:underline cursor-pointer leading-tight" title={currentSong.title}>{currentSong.title}</p>
+                {isBuffering && (
+                  <span className="text-[10px] bg-[#1ed760]/20 text-[#1ed760] px-1.5 py-0.2 rounded font-bold animate-pulse shrink-0">Streaming...</span>
+                )}
+              </div>
               <p className="text-xs text-zinc-500 truncate hover:underline cursor-pointer mt-0.5" title={currentSong.author}>{currentSong.author}</p>
             </div>
           </div>
@@ -79,14 +90,14 @@ export default function MusicPlayer({
           </button>
           
           <motion.button 
-            whileHover={currentSong && !playingSongId ? { scale: 1.05 } : {}}
-            whileTap={currentSong && !playingSongId ? { scale: 0.95 } : {}}
+            whileHover={currentSong && !isBuffering ? { scale: 1.05 } : {}}
+            whileTap={currentSong && !isBuffering ? { scale: 0.95 } : {}}
             className="bg-white text-black rounded-full p-2 disabled:opacity-50 flex items-center justify-center w-9 h-9 shadow-sm"
             onClick={togglePlay}
-            disabled={!currentSong || playingSongId}
+            disabled={!currentSong}
           >
-            {playingSongId ? (
-              <div className="w-4 h-4 border-2 border-zinc-300 border-t-black rounded-full animate-spin"></div>
+            {isBuffering ? (
+              <div className="w-4 h-4 border-2 border-zinc-400 border-t-black rounded-full animate-spin"></div>
             ) : isPlaying ? (
               <Pause fill="currentColor" size={16} />
             ) : (

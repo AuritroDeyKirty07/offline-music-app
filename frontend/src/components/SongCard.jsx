@@ -1,8 +1,8 @@
 import { Play, Download, Trash2, AudioLines, ListPlus, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export default function SongCard({ song, activeTab, playingSongId, playSong, handleDeleteSong, formatDuration, setPlaylistModalSong }) {
-  const isPlaying = playingSongId === song.id;
+export default function SongCard({ song, activeTab, playingSongId, isPlaying, isBuffering, playSong, handleDeleteSong, formatDuration, setPlaylistModalSong }) {
+  const isCurrentSong = playingSongId === song.id;
 
   return (
     <motion.div 
@@ -14,7 +14,7 @@ export default function SongCard({ song, activeTab, playingSongId, playSong, han
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className="bg-[#121212] border border-white/5 hover:border-white/10 p-3 rounded-xl cursor-pointer group transition-colors relative"
       onClick={() => {
-        if (!isPlaying) playSong(song);
+        if (!isCurrentSong || !isPlaying) playSong(song);
       }}
     >
       <div className="relative aspect-square md:aspect-video mb-3 rounded-lg overflow-hidden shadow-md">
@@ -36,17 +36,20 @@ export default function SongCard({ song, activeTab, playingSongId, playSong, han
           </div>
         )}
         
-        {/* Play Overlay */}
-        <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-          {!isPlaying && (
-            <button className="w-12 h-12 bg-[#1ed760] rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl">
-              <Play fill="black" className="ml-1 text-black" size={24} />
-            </button>
-          )}
-          {isPlaying && (
+        {/* Play Overlay / Loader */}
+        <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+          {isCurrentSong && isBuffering ? (
+            <div className="w-12 h-12 bg-black/80 rounded-full flex items-center justify-center backdrop-blur-sm shadow-xl border border-[#1ed760]/40">
+              <div className="w-6 h-6 border-2 border-white/20 border-t-[#1ed760] rounded-full animate-spin"></div>
+            </div>
+          ) : isCurrentSong && isPlaying ? (
             <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm shadow-xl border border-white/10">
               <AudioLines className="text-[#1ed760] animate-pulse" size={24} />
             </div>
+          ) : (
+            <button className="w-12 h-12 bg-[#1ed760] rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-xl">
+              <Play fill="black" className="ml-1 text-black" size={24} />
+            </button>
           )}
         </div>
 

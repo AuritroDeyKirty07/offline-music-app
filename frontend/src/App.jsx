@@ -30,6 +30,7 @@ function App() {
   
   const [isSearching, setIsSearching] = useState(false);
   const [playingSongId, setPlayingSongId] = useState(null);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [visibleArtistsCount, setVisibleArtistsCount] = useState(15);
   const [isOfflineMode, setIsOfflineMode] = useState(true);
   
@@ -102,9 +103,26 @@ function App() {
     
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleLoadedMetadata = () => setDuration(audio.duration);
+    const handleWaiting = () => setIsBuffering(true);
+    const handleLoadStart = () => setIsBuffering(true);
+    const handlePlaying = () => {
+      setIsBuffering(false);
+      setIsPlaying(true);
+      setPlayingSongId(null);
+    };
+    const handleCanPlay = () => setIsBuffering(false);
+    const handleError = () => {
+      setIsBuffering(false);
+      setPlayingSongId(null);
+    };
     
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('waiting', handleWaiting);
+    audio.addEventListener('loadstart', handleLoadStart);
+    audio.addEventListener('playing', handlePlaying);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('error', handleError);
     
     return () => {
       clearInterval(libraryInterval);
@@ -112,6 +130,11 @@ function App() {
       audio.src = '';
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('waiting', handleWaiting);
+      audio.removeEventListener('loadstart', handleLoadStart);
+      audio.removeEventListener('playing', handlePlaying);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('error', handleError);
     };
   }, []);
   
@@ -271,6 +294,7 @@ function App() {
     
     setPlayingSongId(song.id);
     setCurrentSong(song); 
+    setIsBuffering(true);
     
     const audio = audioRef.current;
     if (audio) {
@@ -292,6 +316,7 @@ function App() {
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.then(() => {
+          setIsBuffering(false);
           setIsPlaying(true);
         }).catch(e => {
           if (e.name !== 'AbortError') {
@@ -299,7 +324,14 @@ function App() {
             // Fallback to stream route if static file path failed
             if (audio.src !== `${API_BASE}/stream/${encodeURIComponent(song.id)}`) {
               audio.src = `${API_BASE}/stream/${encodeURIComponent(song.id)}`;
-              audio.play().catch(() => {});
+              audio.play().then(() => {
+                setIsBuffering(false);
+                setIsPlaying(true);
+              }).catch(() => {
+                setIsBuffering(false);
+              });
+            } else {
+              setIsBuffering(false);
             }
           }
         });
@@ -308,7 +340,6 @@ function App() {
     
     setCurrentTime(0);
     setDuration(0);
-    setPlayingSongId(null);
 
     // Non-blocking background call for auto-download if enabled
     axios.post(`${API_BASE}/play`, { song, download: isOfflineMode }).then(() => {
@@ -708,7 +739,9 @@ function App() {
                           key={song.id}
                           song={song}
                           activeTab={activeTab}
-                          playingSongId={playingSongId}
+                          playingSongId={playingSongId || (currentSong?.id === song.id ? song.id : null)}
+                          isPlaying={isPlaying && currentSong?.id === song.id}
+                          isBuffering={isBuffering && (currentSong?.id === song.id || playingSongId === song.id)}
                           playSong={playSong}
                           handleDeleteSong={handleDeleteSong}
                           formatDuration={formatDuration}
@@ -823,6 +856,7 @@ function App() {
         currentSong={currentSong}
         isPlaying={isPlaying}
         playingSongId={playingSongId}
+        isBuffering={isBuffering}
         isAutoplay={isAutoplay}
         setIsAutoplay={setIsAutoplay}
         handlePlayPrevious={handlePlayPrevious}

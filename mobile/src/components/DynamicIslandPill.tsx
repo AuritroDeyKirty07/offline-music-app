@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -6,7 +6,8 @@ import {
     Image,
     TouchableOpacity,
     Animated,
-    Platform
+    Platform,
+    ActivityIndicator
 } from 'react-native';
 import { useAudioPlayer } from '../services/audioPlayer';
 import { Play, Pause, Disc3, ChevronUp } from 'lucide-react-native';
@@ -149,7 +150,7 @@ export default function DynamicIslandPill({ onPressExpand }: DynamicIslandProps)
                     </View>
                 </View>
 
-                {/* Right: Play/Pause button */}
+                {/* Right: Play/Pause/Buffering button */}
                 <TouchableOpacity
                     style={styles.playBtn}
                     onPress={(e) => {
@@ -158,7 +159,9 @@ export default function DynamicIslandPill({ onPressExpand }: DynamicIslandProps)
                     }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    {isPlaying ? (
+                    {isBuffering ? (
+                        <ActivityIndicator size="small" color="#1ed760" />
+                    ) : isPlaying ? (
                         <Pause color="#1ed760" size={16} fill="#1ed760" />
                     ) : (
                         <Play color="#1ed760" size={16} fill="#1ed760" />

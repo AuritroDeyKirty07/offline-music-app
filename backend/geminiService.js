@@ -90,7 +90,7 @@ async function generateWithFailover(prompt, cacheKey = null) {
         availableKeys = allKeys;
     }
 
-    const totalAttempts = Math.min(availableKeys.length, 6);
+    const totalAttempts = availableKeys.length;
     let lastError = null;
 
     for (let attempt = 0; attempt < totalAttempts; attempt++) {
@@ -104,10 +104,10 @@ async function generateWithFailover(prompt, cacheKey = null) {
                 const genAI = new GoogleGenerativeAI(apiKey);
                 const model = genAI.getGenerativeModel({ model: modelName });
 
-                // Set a clean 8s timeout per single key call
+                // Responsive 10s timeout per single key call
                 const callPromise = model.generateContent(prompt);
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error(`Timeout (8s)`)), 8000)
+                    setTimeout(() => reject(new Error(`Timeout (10s)`)), 10000)
                 );
 
                 const result = await Promise.race([callPromise, timeoutPromise]);

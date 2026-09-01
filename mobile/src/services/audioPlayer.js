@@ -32,6 +32,7 @@ export const AudioProvider = ({ children }) => {
     const [queueIndex, setQueueIndex] = useState(0);
     const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'all' | 'one'
     const [isShuffle, setIsShuffle] = useState(false);
+    const [playbackSpeed, setPlaybackSpeedState] = useState(1.0);
 
     const currentSongRef = useRef(null);
     const isPlayingRef = useRef(isPlaying);
@@ -40,6 +41,7 @@ export const AudioProvider = ({ children }) => {
     const queueIndexRef = useRef(0);
     const repeatModeRef = useRef('off');
     const isShuffleRef = useRef(false);
+    const playbackSpeedRef = useRef(1.0);
     const isLibraryQueueRef = useRef(false);
     const finishingRef = useRef(false);
 
@@ -110,6 +112,18 @@ export const AudioProvider = ({ children }) => {
             }
             return nextVal;
         });
+    };
+
+    const setPlaybackSpeed = async (speed) => {
+        setPlaybackSpeedState(speed);
+        playbackSpeedRef.current = speed;
+        if (sound) {
+            try {
+                await sound.setRateAsync(speed, true);
+            } catch (e) {
+                console.warn('Failed to set playback rate:', e);
+            }
+        }
     };
 
     const playSong = async (
@@ -204,6 +218,15 @@ export const AudioProvider = ({ children }) => {
                 console.log('🌐 Streaming online:', uri);
             }
 
+            // Auto-download to phone storage if enabled
+            getPreferences().then(prefs => {
+                if (prefs.autoDownload === true && !offlineSong && !song.localUri) {
+                    downloadSong(song, api.defaults.baseURL).catch(err => {
+                        console.log('Background mobile auto-download:', err?.message || err);
+                    });
+                }
+            }).catch(() => {});
+
             if (playId !== playbackIdRef.current) {
                 return;
             }
@@ -214,6 +237,8 @@ export const AudioProvider = ({ children }) => {
                     {
                         shouldPlay: true,
                         progressUpdateIntervalMillis: 500,
+                        rate: playbackSpeedRef.current || 1.0,
+                        shouldCorrectPitch: true,
                     }
                 );
 
@@ -496,6 +521,8 @@ export const AudioProvider = ({ children }) => {
                 queueIndex,
                 repeatMode,
                 isShuffle,
+                playbackSpeed,
+                setPlaybackSpeed,
 
                 playSong,
                 togglePlayPause,

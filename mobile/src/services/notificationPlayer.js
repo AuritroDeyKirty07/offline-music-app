@@ -1,4 +1,4 @@
-﻿import * as Notifications from 'expo-notifications';
+import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 const NOTIFICATION_ID = 'chord_playback_notification';
@@ -14,14 +14,16 @@ Notifications.setNotificationHandler({
 export const setupNotificationChannels = async () => {
     if (Platform.OS === 'android') {
         try {
+            await Notifications.requestPermissionsAsync();
             await Notifications.setNotificationChannelAsync('music_playback', {
                 name: 'Music Playback',
                 importance: Notifications.AndroidImportance.LOW,
-                vibrationPattern: [0, 250, 250, 250],
+                vibrationPattern: [0],
                 lightColor: '#1ed760',
                 lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
                 sound: null,
                 enableVibrate: false,
+                showBadge: false,
             });
         } catch (e) {
             console.warn('Failed to set notification channel:', e);
@@ -37,7 +39,7 @@ export const updateMediaNotification = async (song, isPlaying = true) => {
 
         const statusIcon = isPlaying ? '▶️' : '⏸️';
         const title = `${statusIcon} ${song.title || 'Playing Music'}`;
-        const body = `${song.author || 'Chord Music'} • Chord Player`;
+        const body = `${song.author || 'Chord Music'} • Chord Offline Player`;
 
         await Notifications.scheduleNotificationAsync({
             identifier: NOTIFICATION_ID,
@@ -46,8 +48,9 @@ export const updateMediaNotification = async (song, isPlaying = true) => {
                 body,
                 sound: null,
                 sticky: true,
+                color: '#1ed760',
                 priority: Notifications.AndroidNotificationPriority.LOW,
-                data: { songId: song.id },
+                data: { songId: song.id, isPlaying },
             },
             trigger: null, // show immediately
         });

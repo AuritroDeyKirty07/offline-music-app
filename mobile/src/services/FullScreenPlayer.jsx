@@ -52,6 +52,8 @@ export default function FullScreenPlayer({ visible, onClose }) {
     toggleRepeat,
     isShuffle,
     toggleShuffle,
+    playbackSpeed,
+    setPlaybackSpeed,
   } = useAudioPlayer();
 
   const [showQueue, setShowQueue] = useState(false);
@@ -271,6 +273,18 @@ export default function FullScreenPlayer({ visible, onClose }) {
                 </View>
                 <View style={styles.actionButtonsRow}>
                   <TouchableOpacity
+                    onPress={() => {
+                      const speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
+                      const currIdx = speeds.indexOf(playbackSpeed || 1.0);
+                      const nextIdx = (currIdx + 1) % speeds.length;
+                      setPlaybackSpeed(speeds[nextIdx]);
+                    }}
+                    style={styles.speedBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.speedBtnText}>{(playbackSpeed || 1.0) + 'x'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     onPress={() => setShowAddToPlaylist(true)}
                     style={styles.actionIconBtn}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -440,6 +454,20 @@ const styles = StyleSheet.create({
   },
   actionIconBtn: {
     padding: 6,
+  },
+  speedBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    marginRight: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  speedBtnText: {
+    color: "#1ed760",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   title: {
     color: "white",

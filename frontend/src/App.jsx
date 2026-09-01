@@ -199,7 +199,12 @@ function App() {
     setIsSearching(true);
     try {
       const res = await axios.get(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
-      setResults(res.data);
+      const libIds = new Set((library || []).map(s => s.id));
+      const mapped = (res.data || []).map(s => ({
+        ...s,
+        isDownloaded: libIds.has(s.id) || s.isDownloaded === true
+      }));
+      setResults(mapped);
     } catch (err) {
       console.error(err);
     } finally {

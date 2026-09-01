@@ -1,4 +1,4 @@
-import { Play, Download, Trash2, AudioLines, ListPlus } from 'lucide-react';
+import { Play, Download, Trash2, AudioLines, ListPlus, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function SongCard({ song, activeTab, playingSongId, playSong, handleDeleteSong, formatDuration, setPlaylistModalSong }) {
@@ -27,6 +27,14 @@ export default function SongCard({ song, activeTab, playingSongId, playSong, han
           }}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
         />
+
+        {/* Downloaded Tick Badge */}
+        {song.isDownloaded && (
+          <div className="absolute top-2 left-2 bg-[#1ed760] text-black text-[11px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg z-10">
+            <Check size={12} strokeWidth={3.5} />
+            <span>Downloaded</span>
+          </div>
+        )}
         
         {/* Play Overlay */}
         <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -79,8 +87,15 @@ export default function SongCard({ song, activeTab, playingSongId, playSong, han
           {song.title}
         </h3>
         <div className="flex items-center justify-between">
-          <p className="text-zinc-400 text-sm truncate max-w-[70%]">{song.author}</p>
-          <span className="text-zinc-500 text-xs font-medium bg-white/5 px-2 py-0.5 rounded-md">
+          <div className="flex items-center gap-1.5 truncate max-w-[70%]">
+            <p className="text-zinc-400 text-sm truncate">{song.author}</p>
+            {song.isDownloaded && (
+              <span className="bg-[#1ed760]/20 text-[#1ed760] p-0.5 rounded-full flex-shrink-0" title="Downloaded / Offline Ready">
+                <Check size={11} strokeWidth={3} />
+              </span>
+            )}
+          </div>
+          <span className="text-zinc-500 text-xs font-medium bg-white/5 px-2 py-0.5 rounded-md flex-shrink-0">
             {formatDuration(song.duration)}
           </span>
         </div>

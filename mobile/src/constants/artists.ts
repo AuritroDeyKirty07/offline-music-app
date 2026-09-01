@@ -8,7 +8,7 @@ export const artistsList = [
     'Eminem', 'Rihanna', 'Adele', 'Katy Perry', 'Ariana Grande', 'Selena Gomez',
     'Coldplay', 'Imagine Dragons', 'Alan Walker', 'Marshmello', 'Martin Garrix', 'DJ Snake',
     'Masoom Sharma', 'Gulzaar Chhaniwala', 'Renuka Panwar', 'Bad Bunny', 'BTS', 'BLACKPINK'
-]};
+];
 
 export const genresList = [
     { name: 'Pop', color: '#ec4899' },

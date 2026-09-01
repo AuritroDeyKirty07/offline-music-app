@@ -119,20 +119,15 @@ export const initApiUrl = async () => {
             // Background check if valid, else auto-discover
             pingServer(sanitized, 2000).then(ok => {
                 if (!ok) autoDiscoverServer();
-            });
+            }).catch(() => {});
             return sanitized;
         }
     } catch (e) {}
 
     api.defaults.baseURL = DEFAULT_API_URL;
-    autoDiscoverServer();
+    autoDiscoverServer().catch(() => {});
     return DEFAULT_API_URL;
 };
-
-// Automatically run init on client
-if (!isServerSide) {
-    initApiUrl().catch(() => {});
-}
 
 // Auto-recover on network error
 api.interceptors.response.use(

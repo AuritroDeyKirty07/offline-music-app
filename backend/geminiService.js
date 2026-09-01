@@ -1,15 +1,12 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-
-// ============================================================
-// CONFIGURATION & KEY POOL
-// ============================================================
+const fs = require('fs');
+const path = require('path');
 
 const CANDIDATE_MODELS = [
     'gemini-3.6-flash',
     'gemini-3.7-flash',
     'gemini-3.1-flash-lite',
-    'gemini-3.5-flash',
-    'gemini-3.1-pro-preview'
+    'gemini-3.5-flash'
 ];
 
 function getApiKeys() {
@@ -23,10 +20,24 @@ function getApiKeys() {
         rawKeys.push(process.env.GEMINI_API_KEY);
     }
 
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= 50; i++) {
         const key = process.env[`GEMINI_API_KEY_${i}`];
         if (key) rawKeys.push(key);
     }
+
+    // Direct fallback parse from .env to guarantee all pasted keys are recognized
+    try {
+        const envPath = path.join(__dirname, '.env');
+        if (fs.existsSync(envPath)) {
+            const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith('AQ.') || (trimmed.startsWith('AIza') && !trimmed.includes('='))) {
+                    rawKeys.push(trimmed);
+                }
+            }
+        }
+    } catch (_) {}
 
     // Clean, trim, and deduplicate
     const uniqueKeys = Array.from(new Set(
@@ -40,14 +51,15 @@ function getApiKeys() {
 
 let apiKeys = getApiKeys();
 let currentKeyIndex = 0;
-let currentModelIndex = 0;
+const keyCooldowns = new Map(); // apiKey -> cooldown expiry timestamp (ms)
+const COOLDOWN_DURATION_MS = 90 * 1000; // 90 seconds cooldown on 429/quota error
 const responseCache = new Map();
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes cache
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
-console.log(`[GeminiService] Initialized with ${apiKeys.length} API keys and ${CANDIDATE_MODELS.length} fallback models.`);
+console.log(`[GeminiService] Initialized with ${apiKeys.length} API keys and sequential single-call failover pool.`);
 
 // ============================================================
-// CORE ROTATION & RETRY ENGINE
+// CORE SEQUENTIAL ROTATION & RETRY ENGINE (ZERO REDUNDANCY)
 // ============================================================
 
 async function generateWithFailover(prompt, cacheKey = null) {
@@ -59,40 +71,80 @@ async function generateWithFailover(prompt, cacheKey = null) {
         }
     }
 
-    apiKeys = getApiKeys();
-    const validKeys = apiKeys.filter(k => k && k !== 'dummy_key');
-    const modelName = 'gemini-3.6-flash';
-
-    if (validKeys.length === 0) {
+    const allKeys = getApiKeys().filter(k => k && k !== 'dummy_key');
+    if (allKeys.length === 0) {
         throw new Error('No valid Gemini API keys configured');
     }
 
-    try {
-        // Race all valid keys concurrently for instant sub-3s response!
-        const racePromises = validKeys.map(async (apiKey, idx) => {
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const callPromise = model.generateContent(prompt);
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error(`Key ${idx + 1} timed out (18s)`)), 18000)
-            );
-            const result = await Promise.race([callPromise, timeoutPromise]);
-            const text = result.response.text().trim();
-            return { text, idx };
-        });
+    const now = Date.now();
+    // Filter healthy keys not currently in cooldown
+    let availableKeys = allKeys.filter(k => {
+        const expiry = keyCooldowns.get(k);
+        return !expiry || expiry <= now;
+    });
 
-        const winner = await Promise.any(racePromises);
-        console.log(`[GeminiService] Key ${winner.idx + 1}/${validKeys.length} won race!`);
-
-        if (cacheKey) {
-            responseCache.set(cacheKey, { timestamp: Date.now(), data: winner.text });
-        }
-
-        return winner.text;
-    } catch (err) {
-        console.warn(`[GeminiService] All parallel key calls failed:`, err.message);
-        throw err;
+    // If all keys are currently cooling down, clear the oldest cooldowns
+    if (availableKeys.length === 0) {
+        console.warn(`[GeminiService] All keys in cooldown, resetting cooldown timers.`);
+        keyCooldowns.clear();
+        availableKeys = allKeys;
     }
+
+    const totalAttempts = Math.min(availableKeys.length, 6);
+    let lastError = null;
+
+    for (let attempt = 0; attempt < totalAttempts; attempt++) {
+        // Pick exactly ONE key sequentially (round-robin distribution)
+        const keyIdx = (currentKeyIndex + attempt) % availableKeys.length;
+        const apiKey = availableKeys[keyIdx];
+        const keyDisplay = apiKey.substring(0, 8) + '...';
+
+        for (const modelName of CANDIDATE_MODELS) {
+            try {
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: modelName });
+
+                // Set a clean 8s timeout per single key call
+                const callPromise = model.generateContent(prompt);
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`Timeout (8s)`)), 8000)
+                );
+
+                const result = await Promise.race([callPromise, timeoutPromise]);
+                const text = result.response.text().trim();
+
+                if (text) {
+                    // Update currentKeyIndex to next key for the next incoming request
+                    currentKeyIndex = (currentKeyIndex + attempt + 1) % availableKeys.length;
+                    console.log(`[GeminiService] Key [${keyDisplay}] succeeded on ${modelName}`);
+
+                    if (cacheKey) {
+                        responseCache.set(cacheKey, { timestamp: Date.now(), data: text });
+                    }
+                    return text;
+                }
+            } catch (err) {
+                lastError = err;
+                const msg = err.message || '';
+
+                // If rate limited or quota exceeded, put this key on cooldown
+                if (msg.includes('429') || msg.includes('Quota') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('403')) {
+                    keyCooldowns.set(apiKey, Date.now() + COOLDOWN_DURATION_MS);
+                    console.warn(`[GeminiService] Key [${keyDisplay}] rate limited/exhausted. Cooldown for 90s.`);
+                    break; // Move immediately to the next API key in the pool
+                } else if (msg.includes('404') || msg.includes('not found') || msg.includes('unsupported')) {
+                    // Model issue, try next candidate model
+                    continue;
+                } else {
+                    console.warn(`[GeminiService] Key [${keyDisplay}] attempt failed (${msg}). Trying next key.`);
+                    break; // Try next API key
+                }
+            }
+        }
+    }
+
+    console.warn(`[GeminiService] All attempted keys failed:`, lastError?.message);
+    throw lastError || new Error('All Gemini API keys failed');
 }
 
 // ============================================================

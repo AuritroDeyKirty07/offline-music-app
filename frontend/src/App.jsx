@@ -276,11 +276,12 @@ function App() {
     if (audio) {
       audio.pause();
       // Fast path: Immediately set stream or download URL without waiting
+      const serverRoot = API_BASE.replace(/\/api$/, '');
       const isDownloaded = song.isDownloaded || (library || []).some(s => s.id === song.id);
       const matchedLibSong = (library || []).find(s => s.id === song.id);
       let audioUrl = `${API_BASE}/stream/${encodeURIComponent(song.id)}`;
       if (isDownloaded && matchedLibSong && (matchedLibSong.fileExt || matchedLibSong.filename)) {
-        audioUrl = `${API_BASE}/downloads/${encodeURIComponent(matchedLibSong.fileExt || matchedLibSong.filename)}`;
+        audioUrl = `${serverRoot}/downloads/${encodeURIComponent(matchedLibSong.fileExt || matchedLibSong.filename)}`;
       } else if (song.url) {
         audioUrl = song.url;
       }
@@ -290,13 +291,21 @@ function App() {
       audio.crossOrigin = 'anonymous';
       const playPromise = audio.play();
       if (playPromise !== undefined) {
-        playPromise.catch(e => {
-          if (e.name !== 'AbortError') console.error('Audio playback error:', e);
+        playPromise.then(() => {
+          setIsPlaying(true);
+        }).catch(e => {
+          if (e.name !== 'AbortError') {
+            console.error('Audio playback error:', e);
+            // Fallback to stream route if static file path failed
+            if (audio.src !== `${API_BASE}/stream/${encodeURIComponent(song.id)}`) {
+              audio.src = `${API_BASE}/stream/${encodeURIComponent(song.id)}`;
+              audio.play().catch(() => {});
+            }
+          }
         });
       }
     }
     
-    setIsPlaying(true);
     setCurrentTime(0);
     setDuration(0);
     setPlayingSongId(null);

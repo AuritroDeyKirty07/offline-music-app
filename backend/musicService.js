@@ -87,7 +87,8 @@ if (process.env.MONGO_URI) {
 
 async function getDB() {
     if (process.env.MONGO_URI && Song) {
-        return await Song.find().lean();
+        const mongoSongs = await Song.find().lean();
+        return mongoSongs.map(s => ({ ...s, isDownloaded: true }));
     }
 
     if (!fs.existsSync(DB_FILE)) {
@@ -106,9 +107,12 @@ async function getDB() {
             'utf8'
         );
 
-        return data
-            ? JSON.parse(data)
-            : [];
+        const list = data ? JSON.parse(data) : [];
+        // Ensure all songs in the library database have isDownloaded: true
+        return list.map(s => ({
+            ...s,
+            isDownloaded: true
+        }));
     } catch (e) {
         console.error(
             'Failed to read local database:',

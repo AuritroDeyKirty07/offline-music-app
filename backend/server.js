@@ -649,8 +649,6 @@ async function extractStreamUrl(id) {
     } catch (e) {
         console.error('Stream extraction getUrl failed for:', realId, e.message);
     }
-        // play-dl fallback
-    }
 
     return null;
 }

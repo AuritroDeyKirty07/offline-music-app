@@ -124,43 +124,34 @@ const genAI =
 // DIRECTORIES
 // ============================================================
 
-const DOWNLOAD_DIR =
-    process.env.DOWNLOAD_DIR ||
-    path.join(
-        __dirname,
-        'downloads'
-    );
-
-if (
-    !fs.existsSync(
-        DOWNLOAD_DIR
-    )
-) {
-    fs.mkdirSync(
-        DOWNLOAD_DIR,
-        {
-            recursive: true
-        }
-    );
+function resolveDownloadDir() {
+    const candidate1 = path.join(__dirname, 'downloads');
+    const candidate2 = path.resolve(process.env.DOWNLOAD_DIR || 'downloads');
+    if (fs.existsSync(candidate1)) return candidate1;
+    if (fs.existsSync(candidate2)) return candidate2;
+    return candidate1;
 }
+
+const DOWNLOAD_DIR = resolveDownloadDir();
+
+if (!fs.existsSync(DOWNLOAD_DIR)) {
+    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+}
+
+const DATA_DIR =
+    process.env.DATA_DIR ||
+    __dirname;
 
 // ============================================================
 // STATIC DOWNLOAD FILES
 // ============================================================
 
-app.use(
-    '/downloads',
-    express.static(
-        DOWNLOAD_DIR
-    )
-);
-
-app.use(
-    '/api/downloads',
-    express.static(
-        DOWNLOAD_DIR
-    )
-);
+app.use('/downloads', express.static(DOWNLOAD_DIR));
+app.use('/api/downloads', express.static(DOWNLOAD_DIR));
+if (fs.existsSync(path.join(__dirname, 'downloads'))) {
+    app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
+    app.use('/api/downloads', express.static(path.join(__dirname, 'downloads')));
+}
 
 // ============================================================
 // HEALTH CHECK

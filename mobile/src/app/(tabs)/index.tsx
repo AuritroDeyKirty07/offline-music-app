@@ -48,7 +48,8 @@ export default function HomeScreen() {
                 interests: [],
                 languages: prefs.languages || ['Hindi', 'English'],
                 library: [],
-                officialOnly: prefs.officialOnly === true
+                officialOnly: prefs.officialOnly === true,
+                refreshTimestamp: Date.now()
             }, { timeout: 35000 });
 
             if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {

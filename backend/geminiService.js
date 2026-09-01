@@ -330,48 +330,57 @@ The response must STRICTLY be a plain JSON array of strings formatted like ["Son
 }
 
 async function getAiHomeRecommendations(prefs = {}) {
-    const { artists = [], genres = [], interests = [], languages = [], library = [] } = prefs;
-    const cacheKey = `home_${JSON.stringify(prefs)}`;
+    const { artists = [], genres = [], interests = [], languages = [], library = [], refreshTimestamp } = prefs;
+    
+    // Pick random subset of artists to ensure diverse mixes on every refresh
+    const shuffledArtists = [...artists].sort(() => Math.random() - 0.5);
+    const focusArtists = shuffledArtists.slice(0, 6);
 
-    const selectedLangs = Array.isArray(languages) && languages.length > 0 ? languages : ['Punjabi'];
+    const selectedLangs = Array.isArray(languages) && languages.length > 0 ? languages : ['Punjabi', 'Hindi', 'English'];
     const langStr = selectedLangs.join(' and ');
+
+    const randomSeed = refreshTimestamp || Date.now();
 
     let prompt = `You are an elite music curation AI.
 CRITICAL LANGUAGE REQUIREMENT: ONLY recommend songs in the following language(s): "${langStr}".
-IF THE USER CHOSE PUNJABI, 100% OF THE SONGS MUST BE PUNJABI TRACKS! NEVER RETURN ENGLISH OR HINDI SONGS UNLESS SPECIFICALLY REQUESTED.
+IF THE USER CHOSE PUNJABI, 100% OF THE SONGS MUST BE PUNJABI TRACKS! NEVER RETURN SONGS IN OTHER LANGUAGES UNLESS SPECIFICALLY REQUESTED.
+
+Random Mix Seed: ${randomSeed}
 
 User Preferences:
 `;
-    if (artists.length) prompt += `- Favorite Artists: ${artists.join(', ')}\n`;
+    if (focusArtists.length) prompt += `- Focus Artists for this mix: ${focusArtists.join(', ')}\n`;
     if (genres.length) prompt += `- Genres: ${genres.join(', ')}\n`;
     if (interests.length) prompt += `- Moods/Interests: ${interests.join(', ')}\n`;
     if (languages.length) prompt += `- STRICT Language(s): ${langStr}\n`;
     if (library.length) {
-        const libraryTitles = library.map(s => `${s.title} by ${s.author}`).slice(0, 10);
-        prompt += `- Recently listened: ${libraryTitles.join(', ')}\n`;
+        const libraryTitles = library.map(s => `${s.title} by ${s.author}`).slice(0, 5);
+        prompt += `- User's Library: ${libraryTitles.join(', ')}\n`;
     }
 
     prompt += `\nSTRICT RULES:
 1. ONLY return songs strictly in the language(s) "${langStr}". Zero exceptions!
-2. ONLY recommend individual single tracks. DO NOT include compilations, albums, or jukeboxes.
-3. Return EXACTLY 20 song titles formatted as "Song Title - Artist Name".
-4. The response should STRICTLY be a plain JSON array of strings, e.g., ["Song Name - Artist Name", "Another Song - Artist"].
-5. Do not wrap in markdown code blocks. Just valid JSON array.`;
+2. ONLY recommend individual single studio tracks. DO NOT include compilations, albums, or jukeboxes.
+3. Return EXACTLY 16 DIFFERENT song titles formatted as "Song Title - Artist Name".
+4. Provide a FRESH and DIVERSE mix of popular and trending hits.
+5. The response should STRICTLY be a plain JSON array of strings, e.g., ["Song Name - Artist Name", "Another Song - Artist"].
+6. Do not wrap in markdown code blocks. Just valid JSON array.`;
 
     try {
-        const rawText = await generateWithFailover(prompt, cacheKey);
+        // No rigid cache lock - generate live fresh recommendations
+        const rawText = await generateWithFailover(prompt, null);
         const parsed = extractJsonArray(rawText);
         if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.slice(0, 20);
+            return parsed.slice(0, 16);
         }
     } catch (err) {
-        console.warn('[GeminiService] Using smart fallback for home recommendations');
+        console.warn('[GeminiService] Live call failed, using dynamic shuffle fallback:', err.message);
     }
 
-    // Dynamic curated home mix based on languages
+    // Dynamic curated home mix based on languages with random shuffle
     const primaryLang = (languages && languages[0]) || 'Punjabi';
-    const langTracks = FALLBACK_BY_LANGUAGE[primaryLang] || FALLBACK_BY_LANGUAGE['Punjabi'];
-    return langTracks;
+    const langTracks = (FALLBACK_BY_LANGUAGE[primaryLang] || FALLBACK_BY_LANGUAGE['Punjabi']).slice();
+    return langTracks.sort(() => Math.random() - 0.5);
 }
 
 module.exports = {

@@ -49,6 +49,51 @@ export const getOfflineSong = async (songId) => {
     }
 };
 
+// Robust offline file URI finder (checks localUri, sanitized name, encoded name, and legacy ID)
+export const findOfflineAudioUri = async (song) => {
+    if (!song) return null;
+    if (Platform.OS === 'web') return null;
+
+    try {
+        const songId = typeof song === 'string' ? song : song.id;
+        const songs = await getOfflineSongs();
+        const found = songs.find(s => 
+            (songId && s.id === songId) || 
+            (song.title && s.title && s.title.toLowerCase().trim() === song.title.toLowerCase().trim())
+        );
+
+        if (found && found.localUri) {
+            const info = await FileSystem.getInfoAsync(found.localUri);
+            if (info.exists) return found.localUri;
+        }
+
+        if (typeof song === 'object' && song.localUri) {
+            const info = await FileSystem.getInfoAsync(song.localUri);
+            if (info.exists) return song.localUri;
+        }
+
+        if (typeof song === 'object' && song.title) {
+            const cleanName = sanitizeFileName(song.title, song.author);
+            const directUri = `${FileSystem.documentDirectory}${cleanName}`;
+            const info1 = await FileSystem.getInfoAsync(directUri);
+            if (info1.exists) return directUri;
+
+            const encUri = `${FileSystem.documentDirectory}${encodeURIComponent(cleanName)}`;
+            const info2 = await FileSystem.getInfoAsync(encUri);
+            if (info2.exists) return encUri;
+        }
+
+        if (songId) {
+            const legacyUri = `${FileSystem.documentDirectory}${songId}.mp3`;
+            const infoLegacy = await FileSystem.getInfoAsync(legacyUri);
+            if (infoLegacy.exists) return legacyUri;
+        }
+    } catch (e) {
+        console.warn('Error checking offline audio uri:', e);
+    }
+    return null;
+};
+
 // Check whether a song is actually downloaded
 export const isSongDownloaded = async (songId) => {
     try {

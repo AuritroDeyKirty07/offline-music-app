@@ -29,7 +29,6 @@ import {
 import Slider from "@react-native-community/slider";
 import DownloadButton from "./DownloadButton";
 import LikeButton from "./LikeButton";
-import WaveformVisualizer from "./WaveformVisualizer";
 import AddToPlaylistModal from "./AddToPlaylistModal";
 import { useEffect } from "react";
 import { api } from "./api";
@@ -52,8 +51,6 @@ export default function FullScreenPlayer({ visible, onClose }) {
     toggleRepeat,
     isShuffle,
     toggleShuffle,
-    playbackSpeed,
-    setPlaybackSpeed,
   } = useAudioPlayer();
 
   const [showQueue, setShowQueue] = useState(false);
@@ -258,7 +255,6 @@ export default function FullScreenPlayer({ visible, onClose }) {
                 source={{ uri: currentSong.thumbnail }}
                 style={styles.albumArt}
               />
-              <WaveformVisualizer isPlaying={isPlaying} />
             </View>
 
             <View style={styles.infoContainer}>
@@ -272,18 +268,6 @@ export default function FullScreenPlayer({ visible, onClose }) {
                   </Text>
                 </View>
                 <View style={styles.actionButtonsRow}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      const speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
-                      const currIdx = speeds.indexOf(playbackSpeed || 1.0);
-                      const nextIdx = (currIdx + 1) % speeds.length;
-                      setPlaybackSpeed(speeds[nextIdx]);
-                    }}
-                    style={styles.speedBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={styles.speedBtnText}>{(playbackSpeed || 1.0) + 'x'}</Text>
-                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setShowAddToPlaylist(true)}
                     style={styles.actionIconBtn}

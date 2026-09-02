@@ -10,7 +10,7 @@ import { Audio } from 'expo-av';
 
 import { api } from './api';
 
-import { getOfflineSong } from './offlineStorage';
+import { getOfflineSong, findOfflineAudioUri, downloadSong } from './offlineStorage';
 
 import { getPreferences } from './preferences';
 
@@ -32,8 +32,8 @@ export const AudioProvider = ({ children }) => {
     const [queueIndex, setQueueIndex] = useState(0);
     const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'all' | 'one'
     const [isShuffle, setIsShuffle] = useState(false);
-    const [playbackSpeed, setPlaybackSpeedState] = useState(1.0);
 
+    const soundRef = useRef(null);
     const currentSongRef = useRef(null);
     const isPlayingRef = useRef(isPlaying);
     const playbackIdRef = useRef(0);
@@ -41,7 +41,6 @@ export const AudioProvider = ({ children }) => {
     const queueIndexRef = useRef(0);
     const repeatModeRef = useRef('off');
     const isShuffleRef = useRef(false);
-    const playbackSpeedRef = useRef(1.0);
     const isLibraryQueueRef = useRef(false);
     const finishingRef = useRef(false);
 
@@ -78,12 +77,13 @@ export const AudioProvider = ({ children }) => {
     }, [currentSong, isPlaying]);
 
     useEffect(() => {
-        return sound
-            ? () => {
-                sound.unloadAsync().catch(() => {});
+        return () => {
+            if (soundRef.current) {
+                soundRef.current.unloadAsync().catch(() => {});
+                soundRef.current = null;
             }
-            : undefined;
-    }, [sound]);
+        };
+    }, []);
 
     const toggleRepeat = () => {
         setRepeatMode(prev => {
@@ -114,18 +114,6 @@ export const AudioProvider = ({ children }) => {
         });
     };
 
-    const setPlaybackSpeed = async (speed) => {
-        setPlaybackSpeedState(speed);
-        playbackSpeedRef.current = speed;
-        if (sound) {
-            try {
-                await sound.setRateAsync(speed, true);
-            } catch (e) {
-                console.warn('Failed to set playback rate:', e);
-            }
-        }
-    };
-
     const playSong = async (
         song,
         newQueue = null,
@@ -145,11 +133,13 @@ export const AudioProvider = ({ children }) => {
                 throw new Error('Invalid song');
             }
 
-            // Stop currently playing sound
-            if (sound) {
-                await sound.unloadAsync().catch(() => {});
-                setSound(null);
+            // 1. Immediately stop & unload any currently playing sound
+            if (soundRef.current) {
+                const oldSound = soundRef.current;
+                soundRef.current = null;
+                oldSound.unloadAsync().catch(() => {});
             }
+            setSound(null);
 
             // Update queue
             if (newQueue) {
@@ -190,7 +180,7 @@ export const AudioProvider = ({ children }) => {
              * FAST OFFLINE DETECTION:
              * If song exists locally on phone, play offline file immediately!
              */
-            let offlineSong = await getOfflineSong(song.id);
+            let localUri = await findOfflineAudioUri(song);
 
             if (playId !== playbackIdRef.current) {
                 return;
@@ -198,15 +188,12 @@ export const AudioProvider = ({ children }) => {
 
             let uri;
 
-            if (offlineSong && offlineSong.localUri) {
-                uri = offlineSong.localUri;
+            if (localUri) {
+                uri = localUri;
                 console.log('🎵 Playing instantly from local offline storage:', uri);
-            } else if (song.localUri) {
-                uri = song.localUri;
-                console.log('🎵 Playing from song localUri:', uri);
             } else {
                 try {
-                    const playRes = await api.post('/play', { song, download: false }, { timeout: 15000 });
+                    const playRes = await api.post('/play', { song, download: false }, { timeout: 3000 });
                     if (playRes && playRes.data && playRes.data.url) {
                         uri = playRes.data.url;
                     } else {
@@ -218,14 +205,16 @@ export const AudioProvider = ({ children }) => {
                 console.log('🌐 Streaming online:', uri);
             }
 
-            // Auto-download to phone storage if enabled
-            getPreferences().then(prefs => {
-                if (prefs.autoDownload === true && !offlineSong && !song.localUri) {
-                    downloadSong(song, api.defaults.baseURL).catch(err => {
-                        console.log('Background mobile auto-download:', err?.message || err);
-                    });
-                }
-            }).catch(() => {});
+            // Auto-download to phone storage if enabled and not already downloaded
+            if (!localUri) {
+                getPreferences().then(prefs => {
+                    if (prefs.autoDownload === true) {
+                        downloadSong(song, api.defaults.baseURL).catch(err => {
+                            console.log('Background mobile auto-download:', err?.message || err);
+                        });
+                    }
+                }).catch(() => {});
+            }
 
             if (playId !== playbackIdRef.current) {
                 return;
@@ -237,7 +226,6 @@ export const AudioProvider = ({ children }) => {
                     {
                         shouldPlay: true,
                         progressUpdateIntervalMillis: 500,
-                        rate: playbackSpeedRef.current || 1.0,
                         shouldCorrectPitch: true,
                     }
                 );
@@ -247,6 +235,10 @@ export const AudioProvider = ({ children }) => {
                 return;
             }
 
+            if (soundRef.current) {
+                await soundRef.current.unloadAsync().catch(() => {});
+            }
+            soundRef.current = newSound;
             setSound(newSound);
 
             newSound.setOnPlaybackStatusUpdate((status) => {
@@ -352,15 +344,16 @@ export const AudioProvider = ({ children }) => {
     };
 
     const togglePlayPause = async () => {
-        if (!sound) {
+        const activeSound = soundRef.current || sound;
+        if (!activeSound) {
             return;
         }
 
         try {
             if (isPlaying) {
-                await sound.pauseAsync();
+                await activeSound.pauseAsync();
             } else {
-                await sound.playAsync();
+                await activeSound.playAsync();
             }
         } catch (e) {
             console.error('Play/pause error:', e);
@@ -368,12 +361,13 @@ export const AudioProvider = ({ children }) => {
     };
 
     const seekTo = async (millis) => {
-        if (!sound) {
+        const activeSound = soundRef.current || sound;
+        if (!activeSound) {
             return;
         }
 
         try {
-            await sound.setPositionAsync(millis);
+            await activeSound.setPositionAsync(millis);
             setPosition(millis);
         } catch (e) {
             console.error('Seek error:', e);
@@ -521,8 +515,6 @@ export const AudioProvider = ({ children }) => {
                 queueIndex,
                 repeatMode,
                 isShuffle,
-                playbackSpeed,
-                setPlaybackSpeed,
 
                 playSong,
                 togglePlayPause,

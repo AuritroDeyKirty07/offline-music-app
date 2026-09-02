@@ -24,7 +24,7 @@ export const setupNotificationChannels = async () => {
             await Notifications.requestPermissionsAsync();
             await Notifications.setNotificationChannelAsync('music_playback', {
                 name: 'Music Playback',
-                importance: Notifications.AndroidImportance.LOW,
+                importance: Notifications.AndroidImportance.MAX,
                 vibrationPattern: [0],
                 lightColor: '#1ed760',
                 lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
@@ -46,7 +46,7 @@ export const updateMediaNotification = async (song, isPlaying = true) => {
 
         const statusIcon = isPlaying ? '▶️' : '⏸️';
         const title = `${statusIcon} ${song.title || 'Playing Music'}`;
-        const body = `${song.author || 'Chord Music'} • Chord Offline Player`;
+        const body = `${song.author || 'Chord Music'} • Offline Music Player`;
 
         await Notifications.scheduleNotificationAsync({
             identifier: NOTIFICATION_ID,
@@ -55,8 +55,9 @@ export const updateMediaNotification = async (song, isPlaying = true) => {
                 body,
                 sound: null,
                 sticky: true,
+                autoDismiss: false,
                 color: '#1ed760',
-                priority: Notifications.AndroidNotificationPriority.LOW,
+                priority: Notifications.AndroidNotificationPriority.MAX,
                 data: { songId: song.id, isPlaying },
             },
             trigger: null,

@@ -6,7 +6,6 @@ import { useAudioPlayer } from '../../services/audioPlayer';
 import { Play, Pause } from 'lucide-react-native';
 import FullScreenPlayer from '../../services/FullScreenPlayer';
 import LikeButton from '../../services/LikeButton';
-import DynamicIslandPill from '../../components/DynamicIslandPill';
 
 function MiniPlayer({ onExpand }: { onExpand: () => void }) {
     const { currentSong, isPlaying, isBuffering, togglePlayPause }: any = useAudioPlayer();
@@ -39,7 +38,6 @@ export default function TabLayout() {
 
   return (
     <>
-      <DynamicIslandPill onPressExpand={() => setPlayerExpanded(true)} />
       <Tabs
         screenOptions={{
           headerShown: false,

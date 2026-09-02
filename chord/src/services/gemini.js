@@ -1,12 +1,5 @@
 // Standalone In-App Gemini AI Engine (15 Keys Round-Robin + 90s Cooldown)
-
-const RAW_KEYS = process.env.EXPO_PUBLIC_GEMINI_API_KEYS || "";
-
-export const getGeminiKeys = () => {
-    const fromEnv = RAW_KEYS.split(',').map(k => k.trim()).filter(Boolean);
-    if (fromEnv.length > 0) return fromEnv;
-    return [];
-};
+import { GEMINI_API_KEYS } from './geminiKeys';
 
 let currentKeyIndex = 0;
 const keyCooldowns = new Map();
@@ -30,7 +23,7 @@ export async function generateWithFailover(prompt, cacheKey = null) {
         const c = responseCache.get(cacheKey);
         if (Date.now() - c.timestamp < CACHE_TTL_MS) return c.data;
     }
-    const allKeys = getGeminiKeys();
+    const allKeys = GEMINI_API_KEYS;
     if (allKeys.length === 0) throw new Error('No API keys configured');
 
     const now = Date.now();

@@ -163,8 +163,13 @@ export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, set
                                   formatDuration={formatDuration}
                               />
                               <button 
-                                  onClick={(e) => { e.stopPropagation(); removeSong(song.id); }}
-                                  className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                                  onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      if (window.confirm(`Remove "${song.title}" from playlist?`)) {
+                                          removeSong(song.id); 
+                                      }
+                                  }}
+                                  className="absolute top-2 right-2 w-8 h-8 bg-black/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500 shadow-xl z-20"
                                   title="Remove from playlist"
                               >
                                   <Trash2 size={16} className="text-white" />
@@ -303,8 +308,13 @@ export default function PlaylistsView({ playlists, fetchPlaylists, setQueue, set
               <p className="text-zinc-400 text-sm">{playlist.songs?.length || 0} songs</p>
               
               <button
-                onClick={(e) => deletePlaylist(playlist.id, e)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 text-zinc-400 transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm(`Are you sure you want to delete "${playlist.name}"?`)) {
+                    deletePlaylist(playlist.id);
+                  }
+                }}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 text-zinc-400 transition-all z-10"
                 title="Delete Playlist"
               >
                 <Trash2 size={16} />

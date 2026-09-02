@@ -515,10 +515,10 @@ function App() {
   };
 
   const handleDeleteSong = async (id, e) => {
-    e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this song from your library?")) return;
     try {
-      await axios.delete(`${API_BASE}/library/${id}`);
+      await axios.delete(`${API_BASE}/library/${encodeURIComponent(id)}`);
       fetchLibrary();
     } catch (err) {
       console.error("Failed to delete song", err);

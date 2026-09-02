@@ -28,13 +28,6 @@ export default function SongCard({ song, activeTab, playingSongId, isPlaying, is
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
         />
 
-        {/* Downloaded Tick Badge */}
-        {song.isDownloaded && (
-          <div className="absolute top-2 left-2 bg-[#1ed760] text-black text-[11px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg z-10">
-            <Check size={12} strokeWidth={3.5} />
-            <span>Downloaded</span>
-          </div>
-        )}
         
         {/* Play Overlay / Loader */}
         <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-300 ${isCurrentSong ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -54,7 +47,7 @@ export default function SongCard({ song, activeTab, playingSongId, isPlaying, is
         </div>
 
         {/* Action Buttons */}
-        <div className="absolute top-2 right-2 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           {setPlaylistModalSong && (
             <button 
               onClick={(e) => { e.stopPropagation(); setPlaylistModalSong(song); }}
@@ -64,13 +57,13 @@ export default function SongCard({ song, activeTab, playingSongId, isPlaying, is
               <ListPlus size={16} className="text-white" />
             </button>
           )}
-          {song.isDownloaded && activeTab === 'library' && (
+          {activeTab === 'library' && handleDeleteSong && (
             <button 
-              onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }}
-              className="bg-black/70 backdrop-blur-md p-2 rounded-full hover:bg-red-500/80 transition-colors shadow-lg"
+              onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id, e); }}
+              className="bg-black/70 backdrop-blur-md p-2 rounded-full hover:bg-red-500 transition-colors shadow-lg text-white hover:text-white"
               title="Remove from library"
             >
-              <Trash2 size={16} className="text-white" />
+              <Trash2 size={16} />
             </button>
           )}
           {!song.isDownloaded && (activeTab === 'home' || activeTab === 'search') && (

@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "chord",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -38,6 +38,11 @@
           "microphonePermission": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4fdabd40-475e-4376-ab7c-9d7aaa30e14f"
+      }
+    }
   }
 }

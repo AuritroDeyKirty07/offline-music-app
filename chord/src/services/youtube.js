@@ -1,5 +1,5 @@
 ﻿// Standalone Direct High-Speed Music Search & 320kbps Stream Engine
-import { decryptMediaUrl } from './des';
+import { decryptMediaUrl } from './des.js';
 
 const decodeEntities = (s) => {
     if (!s) return '';
@@ -103,6 +103,41 @@ export const searchMusic = async (query, limit = 15) => {
     }
 
     return [];
+};
+
+const MOOD_TERMS = {
+    'Punjabi Hits': ['Karan Aujla', 'Diljit Dosanjh', 'Shubh', 'Sidhu Moose Wala', 'AP Dhillon'],
+    'Bollywood Romantic': ['Arijit Singh', 'Pritam', 'Atif Aslam', 'Shreya Ghoshal', 'Vishal Mishra'],
+    'Hip-Hop Vibes': ['Seedhe Maut', 'Divine', 'KR$NA', 'Badshah', 'Emiway Bantai'],
+    'Chill Lofi': ['Anuv Jain', 'Prateek Kuhad', 'Jasleen Royal', 'Zaeden', 'Bayaan'],
+    'Gym Workout': ['Winning Speech', 'Tauba Tauba', 'Cheques', 'Antidote', 'God Damn'],
+    'All': ['Top Hits Hindi Punjabi', 'Latest Punjabi Songs', 'Arijit Singh', 'Karan Aujla']
+};
+
+export const getMoodTracks = async (mood = 'All') => {
+    const terms = MOOD_TERMS[mood] || MOOD_TERMS['All'];
+    try {
+        const promises = terms.map(t => searchMusic(t, 4));
+        const settled = await Promise.allSettled(promises);
+        const allSongs = [];
+        for (const s of settled) {
+            if (s.status === 'fulfilled' && Array.isArray(s.value)) {
+                allSongs.push(...s.value);
+            }
+        }
+        const seen = new Set();
+        const unique = [];
+        for (const song of allSongs) {
+            const key = (song.title || '').toLowerCase().trim();
+            if (!seen.has(key)) {
+                seen.add(key);
+                unique.push(song);
+            }
+            if (unique.length >= 15) break;
+        }
+        if (unique.length > 0) return unique;
+    } catch (_) {}
+    return searchMusic(mood, 15);
 };
 
 export const getAudioStreamUrl = async (song) => {

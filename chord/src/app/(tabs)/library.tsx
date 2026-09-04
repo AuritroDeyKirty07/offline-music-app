@@ -1,17 +1,18 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { Download, Heart, ListMusic, Trash2, ArrowLeft, Play, Shuffle, Plus, X } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { Download, Heart, ListMusic, Trash2, ArrowLeft, Play, Shuffle, Plus } from 'lucide-react-native';
 import { useAudioPlayer } from '../../services/audioPlayer';
 import { getOfflineSongs, deleteOfflineSong } from '../../services/offlineStorage';
-import { getFavorites, getPlaylists, createPlaylist, deletePlaylist, removeSongFromPlaylist } from '../../services/playlistStorage';
+import { getPlaylists, createPlaylist, deletePlaylist, removeSongFromPlaylist } from '../../services/playlistStorage';
+import { useFavorites } from '../../services/favoritesContext';
 import LikeButton from '../../services/LikeButton';
 import DownloadButton from '../../services/DownloadButton';
 
 export default function LibraryScreen() {
     const { playSong } = useAudioPlayer() as any;
+    const { favorites } = useFavorites();
     const [tab, setTab] = useState<'downloads' | 'favorites' | 'playlists'>('downloads');
     const [downloads, setDownloads] = useState<any[]>([]);
-    const [favorites, setFavorites] = useState<any[]>([]);
     const [playlists, setPlaylists] = useState<any[]>([]);
     const [selectedPlaylist, setSelectedPlaylist] = useState<any | null>(null);
     const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
@@ -19,10 +20,8 @@ export default function LibraryScreen() {
 
     const loadData = async () => {
         const d = await getOfflineSongs();
-        const f = await getFavorites();
         const p = await getPlaylists();
         setDownloads(d);
-        setFavorites(f);
         setPlaylists(p);
         if (selectedPlaylist) {
             const updated = p.find((item: any) => item.id === selectedPlaylist.id);
@@ -76,7 +75,7 @@ export default function LibraryScreen() {
             <View style={styles.container}>
                 <TouchableOpacity onPress={() => setSelectedPlaylist(null)} style={styles.backBtn}>
                     <ArrowLeft color="#fff" size={20} />
-                    <Text style={styles.backBtnText}>Playlists</Text>
+                    <Text style={styles.backBtnText}>Back to Playlists</Text>
                 </TouchableOpacity>
 
                 <View style={styles.playlistHeader}>
@@ -109,7 +108,7 @@ export default function LibraryScreen() {
                     data={songs}
                     keyExtractor={(item, idx) => item.id || String(idx)}
                     contentContainerStyle={{ paddingBottom: 100 }}
-                    ListEmptyComponent={<Text style={styles.emptyText}>No songs in this playlist yet. Browse and add songs from any track menu!</Text>}
+                    ListEmptyComponent={<Text style={styles.emptyText}>No songs in this playlist yet. Browse and tap "+" on any track to add!</Text>}
                     renderItem={({ item, index }) => (
                         <TouchableOpacity onPress={() => playSong(item, songs, index, { isLibrary: true })} style={styles.songRow}>
                             <Image source={{ uri: item.thumbnail }} style={styles.songThumb} />

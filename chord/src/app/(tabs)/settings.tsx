@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, TextInput } from 'react-native';
-import { Sparkles, Check, Search } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { Sparkles, Check } from 'lucide-react-native';
 import { getPreferences, savePreferences } from '../../services/preferences';
 import { ALL_ARTISTS } from '../../constants/artists';
 
@@ -9,7 +9,6 @@ export default function SettingsScreen() {
     const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['Punjabi', 'Hindi']);
     const [selectedGenres, setSelectedGenres] = useState<string[]>(['Pop', 'Hip-Hop']);
     const [selectedArtists, setSelectedArtists] = useState<string[]>([]);
-    const [artistSearch, setArtistSearch] = useState('');
 
     const LANGUAGES = ['Punjabi', 'Hindi', 'English', 'Haryanvi', 'Bhojpuri', 'Tamil', 'Telugu'];
     const GENRES = ['Pop', 'Hip-Hop', 'Romantic', 'Rap', 'Sufi', 'Rock', 'Electronic', 'Acoustic'];
@@ -45,8 +44,6 @@ export default function SettingsScreen() {
         setAutoDownload(val);
         savePreferences({ autoDownload: val });
     };
-
-    const filteredArtists = ALL_ARTISTS.filter(a => a.toLowerCase().includes(artistSearch.toLowerCase()));
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -99,13 +96,8 @@ export default function SettingsScreen() {
             </View>
 
             <Text style={styles.subTitle}>Favorite Artists</Text>
-            <View style={styles.searchBox}>
-                <Search color="#71717a" size={18} style={{ marginRight: 6 }} />
-                <TextInput placeholder="Search artist..." placeholderTextColor="#71717a" value={artistSearch} onChangeText={setArtistSearch} style={styles.searchInput} />
-            </View>
-
             <View style={styles.chipsRow}>
-                {filteredArtists.slice(0, 50).map(artist => {
+                {ALL_ARTISTS.slice(0, 50).map(artist => {
                     const active = selectedArtists.includes(artist);
                     return (
                         <TouchableOpacity key={artist} onPress={() => toggleArtist(artist)} style={[styles.chip, active && styles.chipActive]}>
@@ -134,7 +126,5 @@ const styles = StyleSheet.create({
     chip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#18181b', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, marginRight: 8, marginBottom: 8, borderWidth: 1, borderColor: '#27272a' },
     chipActive: { backgroundColor: '#1ed760', borderColor: '#1ed760' },
     chipText: { color: '#d4d4d8', fontSize: 14 },
-    chipTextActive: { color: '#000', fontWeight: 'bold' },
-    searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#18181b', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#27272a', marginBottom: 10 },
-    searchInput: { flex: 1, color: '#fff', fontSize: 14 }
+    chipTextActive: { color: '#000', fontWeight: 'bold' }
 });

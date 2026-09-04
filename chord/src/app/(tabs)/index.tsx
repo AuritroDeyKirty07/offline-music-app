@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIn
 import { Sparkles, Flame } from 'lucide-react-native';
 import { useAudioPlayer } from '../../services/audioPlayer';
 import { getAiHomeRecommendations } from '../../services/gemini';
-import { searchMusic } from '../../services/youtube';
+import { getMoodTracks } from '../../services/youtube.js';
 import { getPreferences } from '../../services/preferences';
 import LikeButton from '../../services/LikeButton';
 import DownloadButton from '../../services/DownloadButton';
@@ -18,26 +18,15 @@ export default function HomeScreen() {
 
     const MOODS = ['All', 'Punjabi Hits', 'Bollywood Romantic', 'Hip-Hop Vibes', 'Chill Lofi', 'Gym Workout'];
 
-    const getMoodQuery = (mood: string) => {
-        switch (mood) {
-            case 'Punjabi Hits': return 'Trending Punjabi Songs 2024';
-            case 'Bollywood Romantic': return 'Bollywood Romantic Songs';
-            case 'Hip-Hop Vibes': return 'Desi Hip Hop Rap Songs';
-            case 'Chill Lofi': return 'Hindi Lofi Songs';
-            case 'Gym Workout': return 'Workout Motivation Songs Hindi Punjabi';
-            default: return 'Trending Indian Songs 2024';
-        }
-    };
-
     const loadContent = async (mood = selectedMood) => {
         setLoading(true);
         try {
             const prefs = await getPreferences();
-            const aiRecs = await getAiHomeRecommendations(prefs);
+            const [aiRecs, trending] = await Promise.all([
+                getAiHomeRecommendations(prefs),
+                getMoodTracks(mood)
+            ]);
             setAiRecommendations(aiRecs);
-
-            const query = getMoodQuery(mood);
-            const trending = await searchMusic(query, 15);
             setTrendingSongs(trending);
         } catch (_) {}
         setLoading(false);
@@ -79,7 +68,7 @@ export default function HomeScreen() {
             {loading && !refreshing ? (
                 <View style={styles.centerLoader}>
                     <ActivityIndicator size="large" color="#1ed760" />
-                    <Text style={styles.loaderText}>Loading music & AI recommendations...</Text>
+                    <Text style={styles.loaderText}>Loading music & recommendations...</Text>
                 </View>
             ) : (
                 <>
@@ -89,7 +78,7 @@ export default function HomeScreen() {
                     </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
                         {aiRecommendations.map((song, idx) => (
-                            <TouchableOpacity key={song.id || idx} onPress={() => playSong(song, aiRecommendations, idx)} style={styles.card}>
+                            <TouchableOpacity key={song.id ? song.id + idx : idx} onPress={() => playSong(song, aiRecommendations, idx)} style={styles.card}>
                                 <Image source={{ uri: song.thumbnail }} style={styles.cardThumb} />
                                 <Text style={styles.cardTitle} numberOfLines={1}>{song.title}</Text>
                                 <Text style={styles.cardAuthor} numberOfLines={1}>{song.author}</Text>
@@ -102,7 +91,7 @@ export default function HomeScreen() {
                         <Text style={styles.sectionTitle}>{selectedMood === 'All' ? 'Trending Tracks' : selectedMood}</Text>
                     </View>
                     {trendingSongs.map((song, idx) => (
-                        <TouchableOpacity key={song.id || idx} onPress={() => playSong(song, trendingSongs, idx)} style={styles.songRow}>
+                        <TouchableOpacity key={song.id ? song.id + idx : idx} onPress={() => playSong(song, trendingSongs, idx)} style={styles.songRow}>
                             <Image source={{ uri: song.thumbnail }} style={styles.songRowThumb} />
                             <View style={styles.songRowInfo}>
                                 <Text style={styles.songRowTitle} numberOfLines={1}>{song.title}</Text>

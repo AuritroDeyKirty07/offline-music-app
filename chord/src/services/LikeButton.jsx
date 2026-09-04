@@ -1,22 +1,15 @@
-import React, { useState, useEffect } from 'react';
+﻿import React from 'react';
 import { TouchableOpacity } from 'react-native';
 import { Heart } from 'lucide-react-native';
-import { isFavorite, toggleFavorite } from './playlistStorage';
+import { useFavorites } from './favoritesContext';
 
 export default function LikeButton({ song, size = 24, color = '#1ed760', style = {} }) {
-    const [liked, setLiked] = useState(false);
-    useEffect(() => {
-        let mounted = true;
-        if (song && song.id) {
-            isFavorite(song.id).then(res => { if (mounted) setLiked(res); });
-        }
-        return () => { mounted = false; };
-    }, [song?.id]);
+    const { isFavorite, toggleFavorite } = useFavorites();
+    const liked = isFavorite(song);
 
     const handlePress = async () => {
         if (!song) return;
-        const next = await toggleFavorite(song);
-        setLiked(next);
+        await toggleFavorite(song);
     };
 
     return (

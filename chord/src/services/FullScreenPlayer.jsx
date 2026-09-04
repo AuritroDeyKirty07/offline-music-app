@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Modal, View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, ListMusic, Mic2, FolderPlus, Plus, Minus } from 'lucide-react-native';
 import Slider from '@react-native-community/slider';
@@ -16,13 +16,20 @@ export default function FullScreenPlayer({ visible, onClose }) {
     const [showLyrics, setShowLyrics] = useState(false);
     const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
     const [lyricsData, setLyricsData] = useState(null);
+    const [loadingLyrics, setLoadingLyrics] = useState(false);
     const [lyricsOffset, setLyricsOffset] = useState(0);
 
     useEffect(() => {
         if (!currentSong) return;
         setLyricsData(null);
         setLyricsOffset(0);
-        fetchLyrics(currentSong.title, currentSong.author).then(res => setLyricsData(res));
+        setLoadingLyrics(true);
+        fetchLyrics(currentSong.title, currentSong.author).then(res => {
+            setLyricsData(res);
+            setLoadingLyrics(false);
+        }).catch(() => {
+            setLoadingLyrics(false);
+        });
     }, [currentSong?.id, currentSong?.title]);
 
     const formatTime = (millis) => {
@@ -40,8 +47,12 @@ export default function FullScreenPlayer({ visible, onClose }) {
         <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={onClose} style={styles.iconBtn}><ChevronDown color="#fff" size={28} /></TouchableOpacity>
-                    <Text style={styles.headerTitle} numberOfLines={1}>{showQueue ? 'Playing Queue' : showLyrics ? 'Real-Time Lyrics' : 'Now Playing'}</Text>
+                    <TouchableOpacity onPress={onClose} style={styles.iconBtn}>
+                        <ChevronDown color="#fff" size={28} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle} numberOfLines={1}>
+                        {showQueue ? `Playing Queue (${queue.length})` : showLyrics ? 'Real-Time Lyrics' : 'Now Playing'}
+                    </Text>
                     <View style={styles.headerRight}>
                         <TouchableOpacity onPress={() => { setShowLyrics(!showLyrics); setShowQueue(false); }} style={[styles.headerIconBtn, showLyrics && styles.headerIconActive]}>
                             <Mic2 color={showLyrics ? '#1ed760' : '#fff'} size={22} />
@@ -53,16 +64,20 @@ export default function FullScreenPlayer({ visible, onClose }) {
                 </View>
 
                 {showQueue ? (
-                    <ScrollView style={styles.queueScroll}>
-                        {queue.map((song, idx) => (
-                            <TouchableOpacity key={idx} onPress={() => playSong(song, null, idx)} style={[styles.queueItem, idx === queueIndex && styles.queueItemActive]}>
-                                <Image source={{ uri: song.thumbnail }} style={styles.queueThumb} />
-                                <View style={styles.queueInfo}>
-                                    <Text style={[styles.queueSongTitle, idx === queueIndex && { color: '#1ed760' }]} numberOfLines={1}>{song.title}</Text>
-                                    <Text style={styles.queueSongAuthor} numberOfLines={1}>{song.author}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                    <ScrollView style={styles.queueScroll} contentContainerStyle={{ paddingBottom: 40 }}>
+                        {queue.map((song, idx) => {
+                            const isCurrent = currentSong?.id === song.id || idx === queueIndex;
+                            return (
+                                <TouchableOpacity key={song.id ? song.id + idx : idx} onPress={() => playSong(song, null, idx)} style={[styles.queueItem, isCurrent && styles.queueItemActive]}>
+                                    <Image source={{ uri: song.thumbnail }} style={styles.queueThumb} />
+                                    <View style={styles.queueInfo}>
+                                        <Text style={[styles.queueSongTitle, isCurrent && { color: '#1ed760', fontWeight: 'bold' }]} numberOfLines={1}>{song.title}</Text>
+                                        <Text style={styles.queueSongAuthor} numberOfLines={1}>{song.author}</Text>
+                                    </View>
+                                    {isCurrent && <Text style={styles.playingBadge}>PLAYING</Text>}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </ScrollView>
                 ) : showLyrics ? (
                     <View style={styles.lyricsContainer}>
@@ -75,23 +90,36 @@ export default function FullScreenPlayer({ visible, onClose }) {
                                 <Plus color="#a1a1aa" size={16} /><Text style={styles.offsetText}>+0.5s</Text>
                             </TouchableOpacity>
                         </View>
-                        <ScrollView style={styles.lyricsScroll} contentContainerStyle={{ paddingVertical: 40 }}>
-                            {lyricsData?.parsed && lyricsData.parsed.length > 0 ? (
-                                lyricsData.parsed.map((line, index) => {
-                                    const nextLine = lyricsData.parsed[index + 1];
-                                    const isCurrent = currentSeconds >= line.time && (!nextLine || currentSeconds < nextLine.time);
-                                    return <Text key={index} style={[styles.lyricLine, isCurrent && styles.lyricLineActive]}>{line.text}</Text>;
-                                })
-                            ) : lyricsData?.plainLyrics ? (
-                                <Text style={styles.plainLyrics}>{lyricsData.plainLyrics}</Text>
-                            ) : (
-                                <Text style={styles.plainLyrics}>No lyrics available for this track.</Text>
-                            )}
-                        </ScrollView>
+
+                        {loadingLyrics ? (
+                            <View style={styles.lyricsLoadingBox}>
+                                <ActivityIndicator color="#1ed760" size="large" />
+                                <Text style={styles.lyricsLoadingText}>Fetching synced lyrics...</Text>
+                            </View>
+                        ) : (
+                            <ScrollView style={styles.lyricsScroll} contentContainerStyle={{ paddingVertical: 30 }}>
+                                {lyricsData?.parsed && lyricsData.parsed.length > 0 ? (
+                                    lyricsData.parsed.map((line, index) => {
+                                        const nextLine = lyricsData.parsed[index + 1];
+                                        const isCurrent = currentSeconds >= line.time && (!nextLine || currentSeconds < nextLine.time);
+                                        return <Text key={index} style={[styles.lyricLine, isCurrent && styles.lyricLineActive]}>{line.text}</Text>;
+                                    })
+                                ) : lyricsData?.plainLyrics ? (
+                                    <Text style={styles.plainLyrics}>{lyricsData.plainLyrics}</Text>
+                                ) : (
+                                    <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                                        <Mic2 color="#3f3f46" size={48} style={{ marginBottom: 12 }} />
+                                        <Text style={styles.plainLyrics}>No synced lyrics available for this track.</Text>
+                                    </View>
+                                )}
+                            </ScrollView>
+                        )}
                     </View>
                 ) : (
                     <>
-                        <View style={styles.artContainer}><Image source={{ uri: currentSong.thumbnail }} style={styles.albumArt} /></View>
+                        <View style={styles.artContainer}>
+                            <Image source={{ uri: currentSong.thumbnail }} style={styles.albumArt} />
+                        </View>
                         <View style={styles.infoContainer}>
                             <View style={styles.titleRow}>
                                 <View style={{ flex: 1, marginRight: 8 }}>
@@ -130,13 +158,23 @@ export default function FullScreenPlayer({ visible, onClose }) {
                                     <SkipBack color="#fff" size={28} />
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtn}>
-                                    {isBuffering && !isPlaying ? <ActivityIndicator color="#000" size="small" /> : isPlaying ? <Pause color="#000" size={28} fill="#000" /> : <Play color="#000" size={28} fill="#000" />}
+                                    {isBuffering && !isPlaying ? (
+                                        <ActivityIndicator color="#000" size="small" />
+                                    ) : isPlaying ? (
+                                        <Pause color="#000" size={28} fill="#000" />
+                                    ) : (
+                                        <Play color="#000" size={28} fill="#000" />
+                                    )}
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={playNext} style={styles.controlIconBtn}>
                                     <SkipForward color="#fff" size={28} />
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={toggleRepeat} style={styles.controlIconBtn}>
-                                    {repeatMode === 'one' ? <Repeat1 color="#1ed760" size={22} /> : <Repeat color={repeatMode === 'all' ? '#1ed760' : '#71717a'} size={22} />}
+                                    {repeatMode === 'one' ? (
+                                        <Repeat1 color="#1ed760" size={22} />
+                                    ) : (
+                                        <Repeat color={repeatMode === 'all' ? '#1ed760' : '#71717a'} size={22} />
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -178,6 +216,7 @@ const styles = StyleSheet.create({
     queueInfo: { flex: 1 },
     queueSongTitle: { color: '#fff', fontSize: 15, fontWeight: '500', marginBottom: 2 },
     queueSongAuthor: { color: '#71717a', fontSize: 13 },
+    playingBadge: { color: '#1ed760', fontSize: 10, fontWeight: 'bold', borderWidth: 1, borderColor: '#1ed760', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
     lyricsContainer: { flex: 1 },
     offsetControls: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#18181b', padding: 8, borderRadius: 8, marginBottom: 10 },
     offsetBtn: { flexDirection: 'row', alignItems: 'center', padding: 6 },
@@ -186,5 +225,7 @@ const styles = StyleSheet.create({
     lyricsScroll: { flex: 1 },
     lyricLine: { color: '#52525b', fontSize: 20, fontWeight: '600', textAlign: 'center', marginVertical: 12, lineHeight: 28 },
     lyricLineActive: { color: '#1ed760', fontSize: 24, fontWeight: 'bold' },
-    plainLyrics: { color: '#d4d4d8', fontSize: 16, lineHeight: 26, textAlign: 'center' }
+    plainLyrics: { color: '#d4d4d8', fontSize: 16, lineHeight: 26, textAlign: 'center' },
+    lyricsLoadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    lyricsLoadingText: { color: '#71717a', fontSize: 14, marginTop: 12 }
 });

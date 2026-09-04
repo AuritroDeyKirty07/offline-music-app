@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Audio } from 'expo-av';
 import { findOfflineAudioUri, downloadSong } from './offlineStorage';
-import { getAudioStreamUrl } from './youtube';
+import { getAudioStreamUrl, searchMusic } from './youtube.js';
 import { getPreferences } from './preferences';
 import { getAiQueueRecommendations } from './gemini';
 import { updateMediaNotification, dismissMediaNotification } from './notificationPlayer';
@@ -19,7 +19,7 @@ export const AudioProvider = ({ children }) => {
 
     const [queue, setQueue] = useState([]);
     const [queueIndex, setQueueIndex] = useState(0);
-    const [repeatMode, setRepeatMode] = useState('off');
+    const [repeatMode, setRepeatMode] = useState('off'); // 'off' | 'all' | 'one'
     const [isShuffle, setIsShuffle] = useState(false);
 
     const soundRef = useRef(null);
@@ -27,11 +27,13 @@ export const AudioProvider = ({ children }) => {
     const isPlayingRef = useRef(isPlaying);
     const playbackIdRef = useRef(0);
     const queueRef = useRef([]);
+    const originalQueueRef = useRef([]);
     const queueIndexRef = useRef(0);
     const repeatModeRef = useRef('off');
     const isShuffleRef = useRef(false);
     const isLibraryQueueRef = useRef(false);
     const finishingRef = useRef(false);
+    const isAutoFetchingRef = useRef(false);
 
     useEffect(() => { currentSongRef.current = currentSong; }, [currentSong]);
     useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -58,15 +60,24 @@ export const AudioProvider = ({ children }) => {
     }, []);
 
     const toggleRepeat = () => {
-        setRepeatMode(prev => prev === 'off' ? 'all' : (prev === 'all' ? 'one' : 'off'));
+        setRepeatMode(prev => {
+            const nextMode = prev === 'off' ? 'all' : (prev === 'all' ? 'one' : 'off');
+            if (soundRef.current) {
+                soundRef.current.setIsLoopingAsync(nextMode === 'one').catch(() => {});
+            }
+            return nextMode;
+        });
     };
 
     const toggleShuffle = () => {
         setIsShuffle(prev => {
             const nextVal = !prev;
+            const currentQ = [...queueRef.current];
+            const currentIdx = queueIndexRef.current;
+
             if (nextVal) {
-                const currentQ = [...queueRef.current];
-                const currentIdx = queueIndexRef.current;
+                // Turning shuffle ON: keep current song, shuffle upcoming songs
+                originalQueueRef.current = [...currentQ];
                 if (currentQ.length > 1 && currentIdx < currentQ.length) {
                     const currentItem = currentQ[currentIdx];
                     const before = currentQ.slice(0, currentIdx);
@@ -75,6 +86,19 @@ export const AudioProvider = ({ children }) => {
                     const newQ = [...before, currentItem, ...shuffledAfter];
                     setQueue(newQ);
                     queueRef.current = newQ;
+                }
+            } else {
+                // Turning shuffle OFF: restore original queue if available
+                if (originalQueueRef.current.length > 0) {
+                    const origQ = originalQueueRef.current;
+                    const currentItem = currentQ[currentIdx];
+                    const newIdx = origQ.findIndex(s => s.id === currentItem?.id || s.title === currentItem?.title);
+                    setQueue(origQ);
+                    queueRef.current = origQ;
+                    if (newIdx !== -1) {
+                        setQueueIndex(newIdx);
+                        queueIndexRef.current = newIdx;
+                    }
                 }
             }
             return nextVal;
@@ -98,16 +122,15 @@ export const AudioProvider = ({ children }) => {
             }
             setSound(null);
 
-            if (newQueue) {
+            if (newQueue && newQueue.length > 0) {
                 setQueue(newQueue);
                 setQueueIndex(newIndex);
                 queueRef.current = newQueue;
+                originalQueueRef.current = [...newQueue];
                 queueIndexRef.current = newIndex;
-            } else if (queueRef.current.length === 0) {
-                setQueue([song]);
-                setQueueIndex(0);
-                queueRef.current = [song];
-                queueIndexRef.current = 0;
+            } else {
+                setQueueIndex(newIndex);
+                queueIndexRef.current = newIndex;
             }
 
             setCurrentSong(song);
@@ -117,7 +140,11 @@ export const AudioProvider = ({ children }) => {
             setPosition(0);
             setDuration((Number(song.duration) || 0) * 1000);
 
-            await Audio.setAudioModeAsync({ staysActiveInBackground: true, playsInSilentModeIOS: true, shouldRouteThroughEarpiece: false });
+            await Audio.setAudioModeAsync({
+                staysActiveInBackground: true,
+                playsInSilentModeIOS: true,
+                shouldRouteThroughEarpiece: false
+            });
             if (playId !== playbackIdRef.current) return;
 
             let localUri = await findOfflineAudioUri(song);
@@ -132,9 +159,15 @@ export const AudioProvider = ({ children }) => {
 
             if (playId !== playbackIdRef.current) return;
 
+            const isLooping = repeatModeRef.current === 'one';
             const { sound: newSound } = await Audio.Sound.createAsync(
                 { uri },
-                { shouldPlay: true, progressUpdateIntervalMillis: 500, shouldCorrectPitch: true }
+                {
+                    shouldPlay: true,
+                    isLooping,
+                    progressUpdateIntervalMillis: 500,
+                    shouldCorrectPitch: true
+                }
             );
 
             if (playId !== playbackIdRef.current) {
@@ -165,7 +198,8 @@ export const AudioProvider = ({ children }) => {
                 }
             });
 
-            triggerBackgroundAiQueue(song);
+            // Trigger smart autoplay to ensure queue always has upcoming songs
+            triggerAutoplayQueue(song);
         } catch (err) {
             console.warn('Playback error:', err.message);
             setIsBuffering(false);
@@ -173,16 +207,37 @@ export const AudioProvider = ({ children }) => {
         }
     };
 
-    const triggerBackgroundAiQueue = async (song) => {
-        if (isLibraryQueueRef.current) return;
-        try {
-            const currentQ = queueRef.current;
-            const currentIdx = queueIndexRef.current;
-            if (currentQ.length - currentIdx <= 3) {
-                const recs = await getAiQueueRecommendations(song);
-                if (recs && recs.length > 0) appendToQueue(recs);
-            }
-        } catch (_) {}
+    const triggerAutoplayQueue = async (song) => {
+        if (isLibraryQueueRef.current || isAutoFetchingRef.current) return;
+        const currentQ = queueRef.current;
+        const currentIdx = queueIndexRef.current;
+
+        // If queue has 3 or fewer upcoming songs, populate it with related/similar songs immediately!
+        if (currentQ.length - currentIdx <= 3) {
+            isAutoFetchingRef.current = true;
+            try {
+                // 1. Try search by song author or related hit terms
+                const query = song.author && song.author !== 'Unknown Artist' ? song.author : song.title;
+                let related = await searchMusic(query, 10);
+                const existingIds = new Set(currentQ.map(s => s.id));
+                const existingTitles = new Set(currentQ.map(s => (s.title || '').toLowerCase().trim()));
+                let uniqueRelated = related.filter(s => !existingIds.has(s.id) && !existingTitles.has((s.title || '').toLowerCase().trim()));
+
+                // 2. If needed, fallback to AI or general top hits
+                if (uniqueRelated.length < 5) {
+                    const aiRecs = await getAiQueueRecommendations(song);
+                    if (aiRecs && aiRecs.length > 0) {
+                        const newRecs = aiRecs.filter(s => !existingIds.has(s.id) && !existingTitles.has((s.title || '').toLowerCase().trim()));
+                        uniqueRelated = [...uniqueRelated, ...newRecs];
+                    }
+                }
+
+                if (uniqueRelated.length > 0) {
+                    appendToQueue(uniqueRelated);
+                }
+            } catch (_) {}
+            isAutoFetchingRef.current = false;
+        }
     };
 
     const handleSongEnd = () => {
@@ -211,6 +266,9 @@ export const AudioProvider = ({ children }) => {
             playSong(currentQ[currentIdx + 1], null, currentIdx + 1);
         } else if (repeatModeRef.current === 'all') {
             playSong(currentQ[0], null, 0);
+        } else {
+            // End of queue: trigger fresh songs and play
+            triggerAutoplayQueue(currentSongRef.current);
         }
     };
 
@@ -219,8 +277,11 @@ export const AudioProvider = ({ children }) => {
         const currentIdx = queueIndexRef.current;
         if (currentQ.length === 0) return;
         if (position > 4000) { seekTo(0); return; }
-        if (currentIdx > 0) playSong(currentQ[currentIdx - 1], null, currentIdx - 1);
-        else seekTo(0);
+        if (currentIdx > 0) {
+            playSong(currentQ[currentIdx - 1], null, currentIdx - 1);
+        } else {
+            seekTo(0);
+        }
     };
 
     const appendToQueue = (newSongs) => {
@@ -251,7 +312,25 @@ export const AudioProvider = ({ children }) => {
     };
 
     return (
-        <AudioContext.Provider value={{ currentSong, isPlaying, isBuffering, position, duration, queue, queueIndex, repeatMode, isShuffle, playSong, togglePlayPause, seekTo, toggleRepeat, toggleShuffle, playNext, playPrev, appendToQueue }}>
+        <AudioContext.Provider value={{
+            currentSong,
+            isPlaying,
+            isBuffering,
+            position,
+            duration,
+            queue,
+            queueIndex,
+            repeatMode,
+            isShuffle,
+            playSong,
+            togglePlayPause,
+            seekTo,
+            toggleRepeat,
+            toggleShuffle,
+            playNext,
+            playPrev,
+            appendToQueue
+        }}>
             {children}
         </AudioContext.Provider>
     );

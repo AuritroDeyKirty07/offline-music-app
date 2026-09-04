@@ -1,9 +1,11 @@
-import * as FileSystem from 'expo-file-system/legacy';
+﻿import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { getAudioStreamUrl } from './youtube';
 
 const OFFLINE_SONGS_KEY = '@chord_offline_songs';
+
+const normalizeString = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/gi, '').trim();
 
 export const sanitizeFileName = (title, author) => {
     const cTitle = (title || 'Track').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
@@ -23,8 +25,16 @@ export const findOfflineAudioUri = async (song) => {
     if (!song || Platform.OS === 'web') return null;
     try {
         const songId = typeof song === 'string' ? song : song.id;
+        const songTitle = typeof song === 'object' ? song.title : null;
+        const normTitle = songTitle ? normalizeString(songTitle) : null;
+
         const songs = await getOfflineSongs();
-        const found = songs.find(s => (songId && s.id === songId) || (song.title && s.title && s.title.toLowerCase().trim() === song.title.toLowerCase().trim()));
+        const found = songs.find(s => {
+            if (songId && s.id === songId) return true;
+            if (normTitle && s.title && normalizeString(s.title) === normTitle) return true;
+            return false;
+        });
+
         if (found && found.localUri) {
             const inf = await FileSystem.getInfoAsync(found.localUri);
             if (inf.exists) return found.localUri;
@@ -43,8 +53,8 @@ export const findOfflineAudioUri = async (song) => {
     return null;
 };
 
-export const isSongDownloaded = async (songId) => {
-    const uri = await findOfflineAudioUri(songId);
+export const isSongDownloaded = async (songOrId) => {
+    const uri = await findOfflineAudioUri(songOrId);
     return !!uri;
 };
 
@@ -61,7 +71,7 @@ export const downloadSong = async (song) => {
         if (res.status === 200) {
             const item = { ...song, localUri: res.uri, downloadedAt: Date.now() };
             const existing = await getOfflineSongs();
-            const updated = [item, ...existing.filter(s => s.id !== song.id && s.title !== song.title)];
+            const updated = [item, ...existing.filter(s => s.id !== song.id && normalizeString(s.title) !== normalizeString(song.title))];
             await AsyncStorage.setItem(OFFLINE_SONGS_KEY, JSON.stringify(updated));
             return true;
         }

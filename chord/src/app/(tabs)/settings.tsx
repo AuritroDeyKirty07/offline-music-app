@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, TextInput } from 'react-native';
 import { Sparkles, Check, Search } from 'lucide-react-native';
 import { getPreferences, savePreferences } from '../../services/preferences';
@@ -98,14 +98,14 @@ export default function SettingsScreen() {
                 })}
             </View>
 
-            <Text style={styles.subTitle}>Favorite Artists (80+ Roster)</Text>
+            <Text style={styles.subTitle}>Favorite Artists</Text>
             <View style={styles.searchBox}>
                 <Search color="#71717a" size={18} style={{ marginRight: 6 }} />
                 <TextInput placeholder="Search artist..." placeholderTextColor="#71717a" value={artistSearch} onChangeText={setArtistSearch} style={styles.searchInput} />
             </View>
 
             <View style={styles.chipsRow}>
-                {filteredArtists.slice(0, 35).map(artist => {
+                {filteredArtists.slice(0, 50).map(artist => {
                     const active = selectedArtists.includes(artist);
                     return (
                         <TouchableOpacity key={artist} onPress={() => toggleArtist(artist)} style={[styles.chip, active && styles.chipActive]}>

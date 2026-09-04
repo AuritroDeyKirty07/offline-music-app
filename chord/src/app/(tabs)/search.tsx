@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Search as SearchIcon, X } from 'lucide-react-native';
 import { useAudioPlayer } from '../../services/audioPlayer';
@@ -12,13 +12,18 @@ export default function SearchScreen() {
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const QUICK_SEARCHES = ['Karan Aujla', 'Arijit Singh', 'Sidhu Moose Wala', 'AP Dhillon', 'Diljit Dosanjh', 'Taylor Swift', 'Coldplay'];
+    const QUICK_SEARCHES = [
+        'Winning Speech', 'Tauba Tauba', 'Millionaire', 'Husn', 'Tu Hai Kahan',
+        'Softly', 'Kesariya', 'Starboy', 'Blinding Lights', 'Cheques',
+        'God Damn', 'Antidote', 'Sajni', 'Perfect', 'Espresso',
+        'Diler', 'Born to Shine', 'Ilzaam', 'Lover', 'Chuttamalle'
+    ];
 
     const handleSearch = async (textToSearch = query) => {
         if (!textToSearch.trim()) return;
         setLoading(true);
         try {
-            const res = await searchMusic(textToSearch);
+            const res = await searchMusic(textToSearch, 20);
             setResults(res);
         } catch (_) {}
         setLoading(false);
@@ -46,11 +51,11 @@ export default function SearchScreen() {
 
             {results.length === 0 && !loading && (
                 <View style={styles.quickBox}>
-                    <Text style={styles.quickTitle}>Popular Searches</Text>
+                    <Text style={styles.quickTitle}>Popular Trending Songs</Text>
                     <View style={styles.chipContainer}>
-                        {QUICK_SEARCHES.map(artist => (
-                            <TouchableOpacity key={artist} onPress={() => { setQuery(artist); handleSearch(artist); }} style={styles.chip}>
-                                <Text style={styles.chipText}>{artist}</Text>
+                        {QUICK_SEARCHES.map(songName => (
+                            <TouchableOpacity key={songName} onPress={() => { setQuery(songName); handleSearch(songName); }} style={styles.chip}>
+                                <Text style={styles.chipText}>{songName}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -64,8 +69,8 @@ export default function SearchScreen() {
                     data={results}
                     keyExtractor={item => item.id}
                     contentContainerStyle={{ paddingBottom: 100 }}
-                    renderItem={({ item, index }) => (
-                        <TouchableOpacity onPress={() => playSong(item, results, index)} style={styles.songRow}>
+                    renderItem={({ item }) => (
+                        <TouchableOpacity onPress={() => playSong(item, [item], 0)} style={styles.songRow}>
                             <Image source={{ uri: item.thumbnail }} style={styles.songRowThumb} />
                             <View style={styles.songRowInfo}>
                                 <Text style={styles.songRowTitle} numberOfLines={1}>{item.title}</Text>
@@ -85,7 +90,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#09090b', paddingHorizontal: 20, paddingTop: 40 },
     inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#18181b', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#27272a', marginBottom: 16 },
     input: { flex: 1, color: '#fff', fontSize: 16 },
-    quickBox: { marginTop: 20 },
+    quickBox: { marginTop: 10 },
     quickTitle: { color: '#a1a1aa', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
     chipContainer: { flexDirection: 'row', flexWrap: 'wrap' },
     chip: { backgroundColor: '#18181b', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, marginRight: 8, marginBottom: 8, borderWidth: 1, borderColor: '#27272a' },

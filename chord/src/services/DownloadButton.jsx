@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Download, Check } from 'lucide-react-native';
 import { isSongDownloaded, downloadSong } from './offlineStorage';
@@ -10,7 +10,7 @@ export default function DownloadButton({ song, size = 24, color = '#1ed760', sty
     useEffect(() => {
         let mounted = true;
         if (song) {
-            isSongDownloaded(song.id || song).then(res => { if (mounted) setDownloaded(res); });
+            isSongDownloaded(song).then(res => { if (mounted) setDownloaded(res); });
         }
         return () => { mounted = false; };
     }, [song?.id, song?.title]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { Sparkles, Flame } from 'lucide-react-native';
 import { useAudioPlayer } from '../../services/audioPlayer';
@@ -18,6 +18,17 @@ export default function HomeScreen() {
 
     const MOODS = ['All', 'Punjabi Hits', 'Bollywood Romantic', 'Hip-Hop Vibes', 'Chill Lofi', 'Gym Workout'];
 
+    const getMoodQuery = (mood: string) => {
+        switch (mood) {
+            case 'Punjabi Hits': return 'Trending Punjabi Songs 2024';
+            case 'Bollywood Romantic': return 'Bollywood Romantic Songs';
+            case 'Hip-Hop Vibes': return 'Desi Hip Hop Rap Songs';
+            case 'Chill Lofi': return 'Hindi Lofi Songs';
+            case 'Gym Workout': return 'Workout Motivation Songs Hindi Punjabi';
+            default: return 'Trending Indian Songs 2024';
+        }
+    };
+
     const loadContent = async (mood = selectedMood) => {
         setLoading(true);
         try {
@@ -25,9 +36,9 @@ export default function HomeScreen() {
             const aiRecs = await getAiHomeRecommendations(prefs);
             setAiRecommendations(aiRecs);
 
-            const query = mood === 'All' ? 'Trending Punjabi Hindi Songs 2024' : `${mood} Songs`;
-            const trending = await searchMusic(query);
-            setTrendingSongs(trending.slice(0, 15));
+            const query = getMoodQuery(mood);
+            const trending = await searchMusic(query, 15);
+            setTrendingSongs(trending);
         } catch (_) {}
         setLoading(false);
     };
@@ -41,13 +52,20 @@ export default function HomeScreen() {
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1ed760" />}>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.content}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor="#1ed760"
+                    progressViewOffset={60}
+                />
+            }
+        >
             <View style={styles.header}>
-                <View>
-                    <Text style={styles.greeting}>Welcome to</Text>
-                    <Text style={styles.brandTitle}>CHORD</Text>
-                </View>
-                <View style={styles.standaloneBadge}><Text style={styles.standaloneBadgeText}>Standalone Mode</Text></View>
+                <Text style={styles.brandTitle}>CHORD</Text>
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.moodsScroll}>
@@ -65,10 +83,13 @@ export default function HomeScreen() {
                 </View>
             ) : (
                 <>
-                    <View style={styles.sectionHeader}><Sparkles color="#1ed760" size={20} /><Text style={styles.sectionTitle}>AI For You</Text></View>
+                    <View style={styles.sectionHeader}>
+                        <Sparkles color="#1ed760" size={20} />
+                        <Text style={styles.sectionTitle}>AI For You</Text>
+                    </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
                         {aiRecommendations.map((song, idx) => (
-                            <TouchableOpacity key={idx} onPress={() => playSong(song, aiRecommendations, idx)} style={styles.card}>
+                            <TouchableOpacity key={song.id || idx} onPress={() => playSong(song, aiRecommendations, idx)} style={styles.card}>
                                 <Image source={{ uri: song.thumbnail }} style={styles.cardThumb} />
                                 <Text style={styles.cardTitle} numberOfLines={1}>{song.title}</Text>
                                 <Text style={styles.cardAuthor} numberOfLines={1}>{song.author}</Text>
@@ -76,9 +97,12 @@ export default function HomeScreen() {
                         ))}
                     </ScrollView>
 
-                    <View style={[styles.sectionHeader, { marginTop: 24 }]}><Flame color="#ef4444" size={20} /><Text style={styles.sectionTitle}>{selectedMood === 'All' ? 'Trending Tracks' : selectedMood}</Text></View>
+                    <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+                        <Flame color="#ef4444" size={20} />
+                        <Text style={styles.sectionTitle}>{selectedMood === 'All' ? 'Trending Tracks' : selectedMood}</Text>
+                    </View>
                     {trendingSongs.map((song, idx) => (
-                        <TouchableOpacity key={idx} onPress={() => playSong(song, trendingSongs, idx)} style={styles.songRow}>
+                        <TouchableOpacity key={song.id || idx} onPress={() => playSong(song, trendingSongs, idx)} style={styles.songRow}>
                             <Image source={{ uri: song.thumbnail }} style={styles.songRowThumb} />
                             <View style={styles.songRowInfo}>
                                 <Text style={styles.songRowTitle} numberOfLines={1}>{song.title}</Text>
@@ -96,12 +120,9 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#09090b' },
-    content: { padding: 20, paddingBottom: 100 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 20 },
-    greeting: { color: '#a1a1aa', fontSize: 14 },
-    brandTitle: { color: '#fff', fontSize: 28, fontWeight: 'bold', letterSpacing: 1 },
-    standaloneBadge: { backgroundColor: '#18181b', borderColor: '#27272a', borderWidth: 1, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12 },
-    standaloneBadgeText: { color: '#1ed760', fontSize: 12, fontWeight: '600' },
+    content: { padding: 20, paddingBottom: 100, paddingTop: 40 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    brandTitle: { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 1.5 },
     moodsScroll: { marginBottom: 20 },
     moodChip: { backgroundColor: '#18181b', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#27272a' },
     moodChipActive: { backgroundColor: '#1ed760', borderColor: '#1ed760' },
